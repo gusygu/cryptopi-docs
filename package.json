@@ -1,0 +1,63 @@
+{
+  "name": "cryptopi-dynamics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "ts-node": {
+    "project": "tsconfig.scripts.json"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev:web":  "next dev -p 3000",
+    "dev:jobs": "tsx src/scripts/jobs/run-all.ts",
+    "kill:3000": "pwsh -NoProfile -Command \"Get-NetTCPConnection -LocalPort 3000 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }\"",
+   "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "eslint .",
+    "db:clean": "tsx src/scripts/db/clean-db.mts --force",
+    "db:ddl": "tsx src/scripts/db/run-ddls.mts",
+    "run-ddl": "pnpm db:ddl",
+    "db:reset": "run-s db:clean db:ddl",
+    "db:auto-ingest": "tsx src/scripts/jobs/auto-ddl-ingest.mts",
+    "smoke:settings:doctor": "node --import tsx --env-file=.env src/scripts/smokes/smoke-settings-doctor.mts",
+    "job:mat:snapshot": "node --import tsx --env-file=.env src/scripts/jobs/matrices-snapshot.mts",
+    "smoke:doctor:matrices": "node --import tsx --env-file=.env src/scripts/smokes/doctor-matrices-storage.mts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+   "dependencies": {
+    "@types/ws": "^8.18.1",
+    "next": "15.5.2",
+    "pg": "^8.16.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "swr": "^2.3.6",
+    "ws": "^8.18.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0",
+    "@types/node": "^20.12.12",
+    "@types/react": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.2.1",
+    "dotenv": "^17.2.2",
+    "eslint": "^9.10.0",
+    "eslint-config-next": "15.5.2",
+    "npm-run-all": "^4.1.5",
+    "postcss": "^8.4.41",
+    "start-server-and-test": "^2.0.0",
+    "tailwindcss": "^3",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.9",
+    "yargs": "^18.0.0",
+    "zod": "^3.23.8"
+  }
+}

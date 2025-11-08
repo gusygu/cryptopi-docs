@@ -1,0 +1,2 @@
+-- 27_symbols_enrich.sql has been merged into 06_compat_legacy.sql.
+-- Run src/core/db/ddl/06_compat_legacy.sql for the combined DDL.

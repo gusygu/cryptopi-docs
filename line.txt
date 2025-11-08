@@ -1,0 +1,1 @@
+                <td className="p-2 text-right">{r.id_pct == null ? "—" : r.id_pct.toFixed(6)}</td>

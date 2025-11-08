@@ -1,0 +1,2 @@
+-- 31_migrations-symbols.sql has been merged into 24_ingest.sql.
+-- Run src/core/db/ddl/24_ingest.sql for the consolidated ingest/universe DDL.

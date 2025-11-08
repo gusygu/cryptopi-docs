@@ -1,0 +1,5 @@
+
+> cryptopi-dynamics@0.1.0 smoke:harness H:\Users\Gus\source\repo\dynamics\dynamics-b\cryptopi-dynamics
+> node --env-file=.env src/scripts/smokes/smoke-harness.ts
+
+ÔÇëELIFECYCLEÔÇë Command failed with exit code 1.

@@ -1,0 +1,18 @@
+{
+  "defaults": {
+    "expect_size": 64,
+    "attempt_shapes": ["session64", "snapshot64", "session0", "snapshot0", "none"]
+  },
+  "targets": [
+    {
+      "module": "@/core/features/str-aux/calc/executive",
+      "exports": ["executeCalcAndUpdateSession"],
+      "args_shape": "session64"
+    },
+    {
+      "module": "@/core/features/strategy-aux/calc/executive",
+      "exports": ["orchestratorRun"],
+      "args_shape": "snapshot64"
+    }
+  ]
+}

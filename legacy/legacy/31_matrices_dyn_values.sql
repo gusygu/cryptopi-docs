@@ -1,0 +1,2 @@
+-- 31_matrices_dyn_values.sql has been merged into 06_compat_legacy.sql.
+-- Run src/core/db/ddl/06_compat_legacy.sql for the combined DDL.

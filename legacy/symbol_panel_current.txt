@@ -1,0 +1,71 @@
+function SymbolPanel({ sym, row }: { sym: string; row: ApiOut['out'][string] | undefined }) {
+  if (!row) return <div style={cardStyle('#281a1a', '#eab308')}><strong>{sym}</strong><div style={{ opacity: 0.75, fontSize: 12 }}>no data</div></div>;
+  if (!row.ok) return (
+    <div style={cardStyle('#281a1a', '#eab308')}>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <strong>{sym}</strong><span style={{ opacity: 0.7 }}>{row?.error ?? 'unavailable'}</span>
+      </div>
+    </div>
+  );
+
+  const open = row.cards?.opening;
+  const live = row.cards?.live;
+  const ex = row.extrema ?? {};
+  const t24 = row.cards?.opening?.pct24h ?? undefined;
+
+  const vInner = row.stats?.vInner ?? 0;
+  const vOuter = row.stats?.vOuter ?? 0;
+  const vSwap  = row.stats?.vSwap ?? null;
+
+  const gfmAbs = row.stats?.gfmAbs;
+  const dPct   = row.stats?.deltaGfmPct;
+  const shifted = !!row.stats?.shiftedGfm;
+
+  const gfmStr = Number.isFinite(gfmAbs as number)
+    ? `${fmtNum(gfmAbs)}${Number.isFinite(dPct as number) ? ` (${(dPct as number) >= 0 ? '+' : ''}${(dPct as number).toFixed(2)}%)` : ''}`
+    : 'ÔÇö';
+
+  return (
+    <div style={cardStyle(shifted ? '#112530' : '#151a24', shifted ? '#67e8f9' : '#a5b4fc')}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <strong style={{ fontSize: 16 }}>{sym}</strong>
+        <div style={{ fontSize: 12, opacity: 0.75 }}>{row.window} ┬À {row.n} pts</div>
+      </div>
+
+      <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+        <KV label="GFM (╬ö%)" value={gfmStr} accent />
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+          <KV label="price" value={fmtNum(live?.benchmark)} />
+          <KV label="24h" value={fmtPct(t24)} />
+          <KV label="drv" value={fmtPct(live?.pct_drv)} />
+          <KV label="shift" value={shifted ? 'yes' : 'no'} tone={shifted ? 'good' : 'muted'} />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
+          <KV label="opening" value={fmtNum(open?.benchmark)} />
+          <KV label="min" value={fmtNum(ex.priceMin)} />
+          <KV label="max" value={fmtNum(ex.priceMax)} />
+          <KV label="¤â" value={fmtNum(row.stats?.sigma)} />
+          <KV label="|z|" value={fmtNum(row.stats?.zAbs)} />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+          <KV label="vInner" value={fmtNum(vInner)} />
+          <KV label="vOuter" value={fmtNum(vOuter)} />
+          {row.stats?.tendency && <KV label="vTendency" value={fmtNum(row.stats.tendency.score)} />}
+          {vSwap && <KV label="vSwap" value={`${fmtNum(vSwap.score)} (Q=${fmtNum(vSwap.Q)})`} />}
+        </div>
+
+        {row.hist?.counts?.length ? <MiniBars counts={row.hist!.counts} /> : null}
+        <StreamsTable stamps={row.streams?.stamps} />
+
+        {row.db_error && (
+          <div style={cardStyle('#3b1d1d', '#ef4444')}>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>db_error: {row.db_error}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

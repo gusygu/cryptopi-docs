@@ -1,0 +1,2 @@
+-- 15_roles.sql has been merged into 15_admin.sql.
+-- Run src/core/db/ddl/15_admin.sql for the combined admin DDL.

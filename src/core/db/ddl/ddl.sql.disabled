@@ -1,0 +1,806 @@
+# CryptoPill — 12‑file DDL Pack (Merged & Idempotent)
+
+> This pack consolidates the earlier packs/files (aux/core/bootstrap/ddl/cin‑aux) into 12 modular SQL files you can run independently. Each file wraps its statements in `BEGIN/COMMIT` and uses `IF NOT EXISTS`/guarded `DO $$` blocks.
+
+## Run order (suggested)
+
+00_extensions.sql
+01_settings.sql
+02_market.sql
+03_documents.sql
+04_matrices.sql
+05_str_aux.sql
+06_cin_aux_core.sql
+07_cin_aux_runtime.sql
+08_cin_aux_functions.sql
+09_ops.sql
+10_bootstrap_core.sql
+11_views_latest.sql
+
+---
+
+## 00_extensions.sql
+
+```sql
+BEGIN;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;      -- gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";  -- uuid_generate_v4() (compat)
+CREATE EXTENSION IF NOT EXISTS btree_gin;
+COMMIT;
+```
+
+---
+
+## 01_settings.sql
+
+```sql
+BEGIN;
+CREATE SCHEMA IF NOT EXISTS settings;
+
+CREATE TABLE IF NOT EXISTS settings.app_settings (
+  key         text PRIMARY KEY,
+  value       jsonb NOT NULL,
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+INSERT INTO settings.app_settings(key, value) VALUES
+  ('poll_interval_ms', '{"ms":40000}'),
+  ('default_window',   '{"label":"30m"}'),
+  ('default_bins',     '{"bins":128}')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+
+CREATE TABLE IF NOT EXISTS settings.windows (
+  label         text PRIMARY KEY,
+  duration_ms   bigint NOT NULL,
+  bins_default  int NOT NULL CHECK (bins_default > 0),
+  display_order int NOT NULL DEFAULT 100
+);
+
+INSERT INTO settings.windows(label, duration_ms, bins_default, display_order) VALUES
+  ('1m', 60000, 256, 10),
+  ('5m', 300000, 256, 20),
+  ('30m',1800000,128, 30),
+  ('1h', 3600000,128, 40)
+ON CONFLICT (label) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS settings.coin_universe (
+  symbol text PRIMARY KEY,
+  meta   jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT symbol_upper CHECK (symbol = upper(symbol))
+);
+
+-- Per-session snapshot (UUID sessions)
+CREATE TABLE IF NOT EXISTS settings.session_coin_universe (
+  session_id uuid NOT NULL,
+  symbol     text NOT NULL REFERENCES settings.coin_universe(symbol) ON DELETE RESTRICT,
+  PRIMARY KEY (session_id, symbol)
+);
+
+-- Poller book-keeping
+CREATE TABLE IF NOT EXISTS settings.poller_state (
+  name        text PRIMARY KEY,
+  last_run_ts timestamptz,
+  cursor      jsonb NOT NULL DEFAULT '{}',
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_poller_state_updated_at ON settings.poller_state(updated_at DESC);
+COMMIT;
+```
+
+---
+
+## 02_market.sql
+
+```sql
+BEGIN;
+CREATE SCHEMA IF NOT EXISTS market;
+
+CREATE TABLE IF NOT EXISTS market.symbols (
+  symbol           text PRIMARY KEY,
+  base_asset       text NOT NULL,
+  quote_asset      text NOT NULL,
+  status           text NOT NULL DEFAULT 'TRADING',
+  precision_price  int,
+  precision_qty    int,
+  metadata         jsonb NOT NULL DEFAULT '{}',
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+
+-- Klines/Candles
+CREATE TABLE IF NOT EXISTS market.klines (
+  symbol        text NOT NULL REFERENCES market.symbols(symbol) ON UPDATE CASCADE,
+  window_label  text NOT NULL REFERENCES settings.windows(label) ON UPDATE CASCADE,
+  open_time     timestamptz NOT NULL,
+  close_time    timestamptz NOT NULL,
+  open          numeric(38,18) NOT NULL,
+  high          numeric(38,18) NOT NULL,
+  low           numeric(38,18) NOT NULL,
+  close         numeric(38,18) NOT NULL,
+  volume        numeric(38,18) NOT NULL,
+  quote_volume  numeric(38,18),
+  trades        int,
+  taker_buy_base  numeric(38,18),
+  taker_buy_quote numeric(38,18),
+  is_closed     boolean NOT NULL,
+  ts_ingested   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (symbol, window_label, open_time)
+);
+CREATE INDEX IF NOT EXISTS idx_klines_symbol_time_desc ON market.klines(symbol, open_time DESC);
+
+-- 24h ticker snapshots
+CREATE TABLE IF NOT EXISTS market.ticker_24h (
+  symbol          text NOT NULL REFERENCES market.symbols(symbol) ON UPDATE CASCADE,
+  ts              timestamptz NOT NULL,
+  price           numeric(38,18),
+  price_change_pct numeric(20,10),
+  high_price      numeric(38,18),
+  low_price       numeric(38,18),
+  volume          numeric(38,18),
+  quote_volume    numeric(38,18),
+  metadata        jsonb NOT NULL DEFAULT '{}',
+  PRIMARY KEY (symbol, ts)
+);
+
+-- Orderbook snapshots
+CREATE TABLE IF NOT EXISTS market.orderbook_snapshots (
+  symbol        text NOT NULL REFERENCES market.symbols(symbol) ON UPDATE CASCADE,
+  ts            timestamptz NOT NULL,
+  last_update_id bigint,
+  bids          jsonb NOT NULL,
+  asks          jsonb NOT NULL,
+  depth         int NOT NULL,
+  PRIMARY KEY (symbol, ts)
+);
+
+-- Wallet balances (provider-agnostic snapshot)
+CREATE TABLE IF NOT EXISTS market.wallet_balances (
+  asset   text NOT NULL,
+  ts      timestamptz NOT NULL,
+  free    numeric(38,18) NOT NULL,
+  locked  numeric(38,18) NOT NULL,
+  metadata jsonb NOT NULL DEFAULT '{}',
+  PRIMARY KEY (asset, ts)
+);
+COMMIT;
+```
+
+---
+
+## 03_documents.sql
+
+```sql
+BEGIN;
+CREATE SCHEMA IF NOT EXISTS docs;
+
+-- Event ledger (from prior packs)
+CREATE TABLE IF NOT EXISTS docs.app_ledger (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  topic            text NOT NULL,
+  event            text NOT NULL,
+  payload          jsonb,
+  session_id       text,
+  idempotency_key  text UNIQUE,
+  ts_epoch_ms      bigint NOT NULL,
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+
+-- Per-cycle JSON documents (matrices/mea/cin/str reports)
+CREATE TABLE IF NOT EXISTS docs.cycle_documents (
+  domain         text NOT NULL CHECK (domain IN ('matrices','mea','cin','str')),
+  app_session_id text NOT NULL,
+  cycle_ts       bigint NOT NULL,
+  payload        jsonb NOT NULL,
+  pairs_count    int,
+  rows_count     int,
+  notes          text,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (domain, app_session_id, cycle_ts)
+);
+CREATE INDEX IF NOT EXISTS idx_cycle_documents_latest
+  ON docs.cycle_documents (domain, app_session_id, cycle_ts DESC);
+CREATE INDEX IF NOT EXISTS idx_cycle_documents_payload_gin
+  ON docs.cycle_documents USING gin (payload);
+COMMIT;
+```
+
+---
+
+## 04_matrices.sql
+
+```sql
+BEGIN;
+CREATE SCHEMA IF NOT EXISTS matrices;
+
+-- Generic timeseries cell store (from prior dyn_matrix_values)
+CREATE TABLE IF NOT EXISTS matrices.dyn_values (
+  ts_ms       bigint           NOT NULL,
+  matrix_type text             NOT NULL CHECK (matrix_type IN ('benchmark','delta','pct24h','id_pct','pct_drv','ref','pct_ref')),
+  base        text             NOT NULL,
+  quote       text             NOT NULL,
+  value       double precision NOT NULL,
+  meta        jsonb            NOT NULL DEFAULT '{}'::jsonb,
+  PRIMARY KEY (ts_ms, matrix_type, base, quote)
+);
+CREATE INDEX IF NOT EXISTS idx_dyn_values_pair
+  ON matrices.dyn_values (matrix_type, base, quote, ts_ms DESC);
+
+-- Stage table + commit helpers (kept DDL only; functions in helpers)
+CREATE TABLE IF NOT EXISTS matrices.dyn_values_stage (
+  ts_ms       bigint           NOT NULL,
+  matrix_type text             NOT NULL,
+  base        text             NOT NULL,
+  quote       text             NOT NULL,
+  value       double precision NOT NULL,
+  meta        jsonb            NOT NULL DEFAULT '{}'::jsonb,
+  app_session_id text,
+  created_at  timestamptz      NOT NULL DEFAULT now(),
+  PRIMARY KEY (ts_ms, matrix_type, base, quote)
+);
+
+-- Generic array-store for 7 matrices (fast read by window)
+DO $$ BEGIN
+  CREATE TYPE matrices.matrix_type AS ENUM ('bm','pct24h','elta','id_pct','pct_drv','ref','pct_ref');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS matrices.values_store (
+  matrix       matrices.matrix_type NOT NULL,
+  symbol       text NOT NULL,
+  window_label text NOT NULL REFERENCES settings.windows(label),
+  ts           timestamptz NOT NULL,
+  bins         int NOT NULL CHECK (bins > 0),
+  values       double precision[] NOT NULL,
+  summary      jsonb NOT NULL DEFAULT '{}',
+  PRIMARY KEY (matrix, symbol, window_label, ts)
+);
+CREATE INDEX IF NOT EXISTS idx_matrices_latest ON matrices.values_store(matrix, symbol, window_label, ts DESC);
+COMMIT;
+```
+
+---
+
+## 05_str_aux.sql
+
+```sql
+BEGIN;
+CREATE SCHEMA IF NOT EXISTS str_aux;
+
+-- Session state (merged from strategy_aux.str_aux_session)
+CREATE TABLE IF NOT EXISTS str_aux.str_session (
+  id               BIGSERIAL PRIMARY KEY,
+  pair_base        TEXT NOT NULL,
+  pair_quote       TEXT NOT NULL DEFAULT 'USDT',
+  window_key       TEXT NOT NULL,
+  app_session_id   TEXT NOT NULL,
+  opening_stamp    BOOLEAN NOT NULL DEFAULT FALSE,
+  opening_ts       BIGINT,
+  opening_price    DOUBLE PRECISION,
+  price_min        DOUBLE PRECISION,
+  price_max        DOUBLE PRECISION,
+  bench_pct_min    DOUBLE PRECISION NOT NULL DEFAULT 0,
+  bench_pct_max    DOUBLE PRECISION NOT NULL DEFAULT 0,
+  last_update_ms   BIGINT,
+  shifts           INTEGER NOT NULL DEFAULT 0,
+  swaps            INTEGER NOT NULL DEFAULT 0,
+  ui_epoch         INTEGER NOT NULL DEFAULT 0,
+  above_count      INTEGER NOT NULL DEFAULT 0,
+  below_count      INTEGER NOT NULL DEFAULT 0,
+  shift_stamp      BOOLEAN NOT NULL DEFAULT FALSE,
+  gfm_anchor_price DOUBLE PRECISION,
+  gfm_calc_price_last DOUBLE PRECISION,
+  gfm_r_last       DOUBLE PRECISION,
+  gfm_delta_last   DOUBLE PRECISION,
+  last_price       DOUBLE PRECISION,
+  CONSTRAINT uq_str_session_key UNIQUE (pair_base, pair_quote, window_key, app_session_id)
+);
+CREATE INDEX IF NOT EXISTS idx_str_session_lookup
+  ON str_aux.str_session (pair_base, pair_quote, window_key, app_session_id);
+
+-- Events
+CREATE TABLE IF NOT EXISTS str_aux.str_event (
+  id         BIGSERIAL PRIMARY KEY,
+  session_id BIGINT NOT NULL REFERENCES str_aux.str_session(id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL,       -- opening|swap|shift|mark|...
+  payload    JSONB,
+  created_ms BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_str_event_session ON str_aux.str_event(session_id, created_ms DESC);
+
+-- Orderbook/kline samples for microstructure
+CREATE TABLE IF NOT EXISTS str_aux.ob_samples (
+  symbol          text NOT NULL,
+  ts              timestamptz NOT NULL,
+  mid             numeric(38,18) NOT NULL,
+  spread          numeric(38,18) NOT NULL,
+  v_inner         numeric(38,18),
+  v_outer         numeric(38,18),
+  depth_bid       numeric(38,18),
+  depth_ask       numeric(38,18),
+  src_snapshot_ts timestamptz NOT NULL,
+  PRIMARY KEY (symbol, ts)
+);
+
+CREATE TABLE IF NOT EXISTS str_aux.kline_samples (
+  symbol        text NOT NULL,
+  window_label  text NOT NULL REFERENCES settings.windows(label),
+  ts            timestamptz NOT NULL,
+  ret_pct       numeric(20,10),
+  delta_abs     numeric(38,18),
+  volatility    numeric(20,10),
+  src_open_time timestamptz NOT NULL,
+  src_close_time timestamptz NOT NULL,
+  PRIMARY KEY (symbol, window_label, ts)
+);
+
+-- Vectors rollup (UI‑ready)
+CREATE TABLE IF NOT EXISTS str_aux.vectors (
+  symbol        text NOT NULL,
+  window_label  text NOT NULL REFERENCES settings.windows(label),
+  ts            timestamptz NOT NULL,
+  v_inner       numeric(38,18) NOT NULL DEFAULT 0,
+  v_outer       numeric(38,18) NOT NULL DEFAULT 0,
+  spread        numeric(38,18) NOT NULL DEFAULT 0,
+  v_tendency    jsonb NOT NULL DEFAULT '{"score":0,"direction":0,"strength":0,"slope":0,"r":0}',
+  v_swap        jsonb,
+  summary       jsonb NOT NULL DEFAULT '{"scale":100,"bins":0,"samples":0,"inner":{"scaled":0,"unitless":0,"weightSum":0}}',
+  PRIMARY KEY (symbol, window_label, ts)
+);
+CREATE INDEX IF NOT EXISTS idx_vectors_latest ON str_aux.vectors(symbol, window_label, ts DESC);
+COMMIT;
+```
+
+---
+
+## 06_cin_aux_core.sql
+
+```sql
+BEGIN;
+CREATE SCHEMA IF NOT EXISTS cin_aux;
+
+-- UUID session (control plane)
+CREATE TABLE IF NOT EXISTS cin_aux.sessions (
+  session_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  window_label text NOT NULL DEFAULT '',
+  window_bins  int  NOT NULL DEFAULT 0,
+  window_ms    bigint NOT NULL DEFAULT 0,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now()
+);
+
+-- Global & per-session universes
+CREATE TABLE IF NOT EXISTS cin_aux.settings_coin_universe (
+  symbol text PRIMARY KEY,
+  meta   jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT symbol_upper CHECK (symbol = upper(symbol))
+);
+CREATE TABLE IF NOT EXISTS cin_aux.session_coin_universe (
+  session_id uuid NOT NULL REFERENCES cin_aux.sessions(session_id) ON DELETE CASCADE,
+  symbol     text NOT NULL REFERENCES cin_aux.settings_coin_universe(symbol) ON DELETE RESTRICT,
+  PRIMARY KEY (session_id, symbol)
+);
+
+-- Generic matrices (registry + cells)
+CREATE TABLE IF NOT EXISTS cin_aux.mat_registry (
+  mat_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id uuid NOT NULL REFERENCES cin_aux.sessions(session_id) ON DELETE CASCADE,
+  name text NOT NULL,
+  symbol text NOT NULL,
+  window_label text NOT NULL DEFAULT '',
+  bins int NOT NULL DEFAULT 0,
+  meta jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_cin_matreg ON cin_aux.mat_registry(session_id, name, symbol);
+
+CREATE TABLE IF NOT EXISTS cin_aux.mat_cell (
+  cell_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  mat_id uuid NOT NULL REFERENCES cin_aux.mat_registry(mat_id) ON DELETE CASCADE,
+  i int NOT NULL,
+  j int NOT NULL,
+  v double precision NOT NULL,
+  UNIQUE(mat_id, i, j)
+);
+
+-- MEA results (per symbol)
+CREATE TABLE IF NOT EXISTS cin_aux.mea_result (
+  mea_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id uuid NOT NULL REFERENCES cin_aux.sessions(session_id) ON DELETE CASCADE,
+  symbol text NOT NULL REFERENCES cin_aux.settings_coin_universe(symbol) ON DELETE RESTRICT,
+  value double precision NOT NULL,
+  components jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(session_id, symbol)
+);
+CREATE INDEX IF NOT EXISTS idx_cin_mea_session_sym ON cin_aux.mea_result(session_id, symbol);
+COMMIT;
+```
+
+---
+
+## 07_cin_aux_runtime.sql
+
+```sql
+BEGIN;
+-- Runtime trade ledger (BIGINT session lineage per prior strategy_aux)
+CREATE TABLE IF NOT EXISTS cin_aux.rt_session (
+  session_id   BIGSERIAL PRIMARY KEY,
+  window_label TEXT NOT NULL DEFAULT '1h',
+  started_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ended_at     TIMESTAMPTZ,
+  closed       BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS cin_aux.rt_balance (
+  session_id        BIGINT NOT NULL REFERENCES cin_aux.rt_session(session_id) ON DELETE CASCADE,
+  asset_id          TEXT   NOT NULL,
+  opening_principal NUMERIC NOT NULL DEFAULT 0,
+  opening_profit    NUMERIC NOT NULL DEFAULT 0,
+  principal_usdt    NUMERIC NOT NULL DEFAULT 0,
+  profit_usdt       NUMERIC NOT NULL DEFAULT 0,
+  closing_principal NUMERIC,
+  closing_profit    NUMERIC,
+  PRIMARY KEY (session_id, asset_id)
+);
+
+CREATE TABLE IF NOT EXISTS cin_aux.rt_reference (
+  session_id  BIGINT NOT NULL REFERENCES cin_aux.rt_session(session_id) ON DELETE CASCADE,
+  asset_id    TEXT   NOT NULL,
+  ref_usdt    NUMERIC NOT NULL,
+  source_tag  TEXT,
+  computed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (session_id, asset_id)
+);
+
+CREATE TABLE IF NOT EXISTS cin_aux.rt_lot (
+  lot_id      BIGSERIAL PRIMARY KEY,
+  session_id  BIGINT NOT NULL REFERENCES cin_aux.rt_session(session_id) ON DELETE CASCADE,
+  asset_id    TEXT   NOT NULL,
+  origin_move_id BIGINT,
+  p_in_usdt   NUMERIC NOT NULL,
+  units_total NUMERIC NOT NULL,
+  units_free  NUMERIC NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT rt_lot_nonneg CHECK (units_free >= 0 AND units_total >= 0 AND units_free <= units_total)
+);
+
+CREATE TABLE IF NOT EXISTS cin_aux.rt_move (
+  move_id BIGSERIAL PRIMARY KEY,
+  session_id BIGINT NOT NULL REFERENCES cin_aux.rt_session(session_id) ON DELETE CASCADE,
+  ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+  from_asset TEXT NOT NULL,
+  to_asset   TEXT NOT NULL,
+  executed_usdt NUMERIC NOT NULL,
+  fee_usdt      NUMERIC NOT NULL DEFAULT 0,
+  slippage_usdt NUMERIC NOT NULL DEFAULT 0,
+  ref_usdt_target NUMERIC,
+  planned_usdt    NUMERIC,
+  dev_ref_usdt    NUMERIC,
+  comp_principal_usdt NUMERIC NOT NULL DEFAULT 0,
+  comp_profit_usdt    NUMERIC NOT NULL DEFAULT 0,
+  p_bridge_in_usdt    NUMERIC,
+  p_bridge_out_usdt   NUMERIC,
+  lot_units_used      NUMERIC,
+  trace_usdt          NUMERIC NOT NULL DEFAULT 0,
+  profit_consumed_usdt NUMERIC NOT NULL DEFAULT 0,
+  principal_hit_usdt   NUMERIC NOT NULL DEFAULT 0,
+  to_units_received    NUMERIC,
+  residual_from_after  NUMERIC,
+  notes                TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_rt_move_session_ts ON cin_aux.rt_move(session_id, ts);
+CREATE INDEX IF NOT EXISTS idx_rt_move_from ON cin_aux.rt_move(session_id, from_asset, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_rt_move_to   ON cin_aux.rt_move(session_id, to_asset, ts DESC);
+
+CREATE TABLE IF NOT EXISTS cin_aux.rt_move_lotlink (
+  move_id BIGINT NOT NULL REFERENCES cin_aux.rt_move(move_id) ON DELETE CASCADE,
+  lot_id  BIGINT NOT NULL REFERENCES cin_aux.rt_lot(lot_id)   ON DELETE RESTRICT,
+  units_used NUMERIC NOT NULL,
+  p_in_usdt  NUMERIC NOT NULL,
+  PRIMARY KEY (move_id, lot_id)
+);
+
+CREATE TABLE IF NOT EXISTS cin_aux.rt_mark (
+  session_id BIGINT NOT NULL REFERENCES cin_aux.rt_session(session_id) ON DELETE CASCADE,
+  asset_id   TEXT   NOT NULL,
+  ts         TIMESTAMPTZ NOT NULL,
+  price_usdt NUMERIC,
+  bulk_usdt  NUMERIC NOT NULL,
+  PRIMARY KEY (session_id, asset_id, ts)
+);
+
+CREATE TABLE IF NOT EXISTS cin_aux.rt_imprint_luggage (
+  session_id BIGINT PRIMARY KEY REFERENCES cin_aux.rt_session(session_id) ON DELETE CASCADE,
+  imprint_principal_churn_usdt  NUMERIC NOT NULL,
+  imprint_profit_churn_usdt     NUMERIC NOT NULL,
+  imprint_generated_profit_usdt NUMERIC NOT NULL,
+  imprint_trace_sum_usdt        NUMERIC NOT NULL,
+  imprint_devref_sum_usdt       NUMERIC NOT NULL,
+  luggage_total_principal_usdt  NUMERIC NOT NULL,
+  luggage_total_profit_usdt     NUMERIC NOT NULL
+);
+COMMIT;
+```
+
+---
+
+## 08_cin_aux_functions.sql
+
+```sql
+BEGIN;
+-- Parity of prior strategy_aux functions, now under cin_aux namespace
+CREATE OR REPLACE FUNCTION cin_aux.rt_ensure_balance_row(p_session_id BIGINT, p_asset_id TEXT)
+RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+  INSERT INTO cin_aux.rt_balance(session_id, asset_id)
+  VALUES (p_session_id, p_asset_id)
+  ON CONFLICT (session_id, asset_id) DO NOTHING;
+END; $$;
+
+CREATE OR REPLACE FUNCTION cin_aux.rt_register_acquisition(p_session_id BIGINT, p_move_id BIGINT, p_asset_id TEXT, p_units NUMERIC, p_price_usdt NUMERIC)
+RETURNS BIGINT LANGUAGE plpgsql AS $$
+DECLARE v_lot_id BIGINT; BEGIN
+  INSERT INTO cin_aux.rt_lot(session_id, asset_id, origin_move_id, p_in_usdt, units_total, units_free)
+  VALUES (p_session_id, p_asset_id, p_move_id, p_price_usdt, p_units, p_units)
+  RETURNING lot_id INTO v_lot_id; RETURN v_lot_id; END; $$;
+
+CREATE OR REPLACE FUNCTION cin_aux.rt_consume_fifo_lots(p_session_id BIGINT, p_asset_id TEXT, p_units_need NUMERIC)
+RETURNS TABLE (lot_id BIGINT, units_used NUMERIC, p_in_usdt NUMERIC) LANGUAGE plpgsql AS $$
+DECLARE v_remain NUMERIC := p_units_need; v_use NUMERIC; v_row RECORD; BEGIN
+  FOR v_row IN
+    SELECT l.lot_id, l.units_free, l.p_in_usdt
+    FROM cin_aux.rt_lot l
+    WHERE l.session_id = p_session_id AND l.asset_id = p_asset_id AND l.units_free > 0
+    ORDER BY l.created_at, l.lot_id
+  LOOP
+    EXIT WHEN v_remain <= 0;
+    v_use := LEAST(v_row.units_free, v_remain);
+    UPDATE cin_aux.rt_lot SET units_free = units_free - v_use WHERE lot_id = v_row.lot_id;
+    lot_id := v_row.lot_id; units_used := v_use; p_in_usdt := v_row.p_in_usdt; v_remain := v_remain - v_use; RETURN NEXT;
+  END LOOP;
+  IF v_remain > 0 THEN RAISE EXCEPTION 'Not enough units in lots to consume: short %', v_remain; END IF; RETURN;
+END; $$;
+
+CREATE OR REPLACE FUNCTION cin_aux.rt_exec_move_v2(
+  p_session_id BIGINT,
+  p_ts TIMESTAMPTZ,
+  p_from_asset TEXT,
+  p_to_asset   TEXT,
+  p_executed_usdt NUMERIC,
+  p_fee_usdt      NUMERIC,
+  p_slippage_usdt NUMERIC,
+  p_ref_usdt_target NUMERIC,
+  p_planned_usdt    NUMERIC,
+  p_available_usdt  NUMERIC,
+  p_price_from_usdt NUMERIC,
+  p_price_to_usdt   NUMERIC,
+  p_price_bridge_usdt NUMERIC
+) RETURNS BIGINT LANGUAGE plpgsql AS $$
+DECLARE v_move_id BIGINT; v_p_from NUMERIC; v_r_from NUMERIC; v_take_p NUMERIC; v_take_r NUMERIC; v_residual_after NUMERIC; v_dev_ref NUMERIC; v_to_units NUMERIC; v_units_needed NUMERIC; v_weighted_pin NUMERIC := 0; v_total_units NUMERIC := 0; v_trace_usdt NUMERIC := 0; v_profit_consumed NUMERIC := 0; v_principal_hit NUMERIC := 0; rec RECORD; BEGIN
+  v_dev_ref := p_executed_usdt - LEAST(COALESCE(p_ref_usdt_target,p_executed_usdt), COALESCE(p_available_usdt,p_executed_usdt));
+  PERFORM cin_aux.rt_ensure_balance_row(p_session_id, p_from_asset);
+  PERFORM cin_aux.rt_ensure_balance_row(p_session_id, p_to_asset);
+  SELECT principal_usdt, profit_usdt INTO v_p_from, v_r_from FROM cin_aux.rt_balance WHERE session_id=p_session_id AND asset_id=p_from_asset FOR UPDATE;
+  v_take_p := LEAST(p_executed_usdt, v_p_from); v_take_r := p_executed_usdt - v_take_p;
+  UPDATE cin_aux.rt_balance SET principal_usdt = principal_usdt - v_take_p - GREATEST(p_fee_usdt - GREATEST(v_r_from - v_take_r, 0), 0),
+                                profit_usdt    = profit_usdt    - v_take_r - LEAST(p_fee_usdt, GREATEST(v_r_from - v_take_r, 0))
+  WHERE session_id=p_session_id AND asset_id=p_from_asset;
+  UPDATE cin_aux.rt_balance SET principal_usdt = principal_usdt + v_take_p, profit_usdt = profit_usdt + v_take_r
+  WHERE session_id=p_session_id AND asset_id=p_to_asset;
+  SELECT principal_usdt + profit_usdt INTO v_residual_after FROM cin_aux.rt_balance WHERE session_id = p_session_id AND asset_id = p_from_asset;
+  IF p_price_to_usdt IS NOT NULL AND p_price_to_usdt <> 0 THEN v_to_units := p_executed_usdt / p_price_to_usdt; END IF;
+  IF p_price_bridge_usdt IS NOT NULL AND p_price_bridge_usdt <> 0 THEN
+    v_units_needed := p_executed_usdt / p_price_bridge_usdt;
+    IF EXISTS (SELECT 1 FROM cin_aux.rt_lot WHERE session_id=p_session_id AND asset_id=p_from_asset AND units_free>0) THEN
+      FOR rec IN SELECT * FROM cin_aux.rt_consume_fifo_lots(p_session_id, p_from_asset, v_units_needed) LOOP
+        v_total_units := v_total_units + rec.units_used; v_weighted_pin := v_weighted_pin + rec.units_used * rec.p_in_usdt;
+        INSERT INTO cin_aux.rt_move_lotlink(move_id, lot_id, units_used, p_in_usdt) VALUES (NULL, rec.lot_id, rec.units_used, rec.p_in_usdt);
+      END LOOP;
+      IF v_total_units > 0 THEN
+        v_weighted_pin := v_weighted_pin / v_total_units; v_trace_usdt := p_executed_usdt - (v_total_units * v_weighted_pin);
+        IF v_trace_usdt > 0 THEN v_profit_consumed := v_trace_usdt; ELSIF v_trace_usdt < 0 THEN v_principal_hit := -v_trace_usdt; END IF;
+      END IF;
+    END IF;
+  END IF;
+  INSERT INTO cin_aux.rt_move (
+    session_id, ts, from_asset, to_asset, executed_usdt, fee_usdt, slippage_usdt,
+    ref_usdt_target, planned_usdt, dev_ref_usdt, comp_principal_usdt, comp_profit_usdt,
+    p_bridge_in_usdt, p_bridge_out_usdt, lot_units_used, trace_usdt,
+    profit_consumed_usdt, principal_hit_usdt, to_units_received, residual_from_after
+  ) VALUES (
+    p_session_id, p_ts, p_from_asset, p_to_asset, p_executed_usdt, p_fee_usdt, p_slippage_usdt,
+    p_ref_usdt_target, p_planned_usdt, v_dev_ref, v_take_p, v_take_r,
+    CASE WHEN v_total_units > 0 THEN v_weighted_pin ELSE NULL END,
+    p_price_bridge_usdt, v_total_units, COALESCE(v_trace_usdt,0), COALESCE(v_profit_consumed,0), COALESCE(v_principal_hit,0), v_to_units, v_residual_after
+  ) RETURNING move_id INTO v_move_id;
+  UPDATE cin_aux.rt_move_lotlink SET move_id = v_move_id WHERE move_id IS NULL;
+  IF v_to_units IS NOT NULL AND v_to_units > 0 AND p_price_to_usdt IS NOT NULL THEN
+    PERFORM cin_aux.rt_register_acquisition(p_session_id, v_move_id, p_to_asset, v_to_units, p_price_to_usdt);
+  END IF;
+  RETURN v_move_id;
+END; $$;
+
+CREATE OR REPLACE FUNCTION cin_aux.rt_add_mark(p_session_id BIGINT, p_asset_id TEXT, p_ts TIMESTAMPTZ, p_bulk_usdt NUMERIC)
+RETURNS VOID LANGUAGE sql AS $$
+  INSERT INTO cin_aux.rt_mark(session_id, asset_id, ts, bulk_usdt)
+  VALUES (p_session_id, p_asset_id, p_ts, p_bulk_usdt)
+  ON CONFLICT DO NOTHING;
+$$;
+
+CREATE OR REPLACE FUNCTION cin_aux.rt_close_session_v2(p_session_id BIGINT)
+RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE cin_aux.rt_balance b
+     SET closing_principal = b.principal_usdt,
+         closing_profit    = m.bulk_usdt - b.principal_usdt
+  FROM (
+    SELECT DISTINCT ON (asset_id) asset_id, bulk_usdt
+    FROM cin_aux.rt_mark
+    WHERE session_id = p_session_id
+    ORDER BY asset_id, ts DESC
+  ) m
+  WHERE b.session_id = p_session_id AND b.asset_id = m.asset_id;
+
+  INSERT INTO cin_aux.rt_imprint_luggage(
+    session_id,
+    imprint_principal_churn_usdt,
+    imprint_profit_churn_usdt,
+    imprint_generated_profit_usdt,
+    imprint_trace_sum_usdt,
+    imprint_devref_sum_usdt,
+    luggage_total_principal_usdt,
+    luggage_total_profit_usdt
+  )
+  SELECT
+    p_session_id,
+    COALESCE((SELECT SUM(comp_principal_usdt) FROM cin_aux.rt_move WHERE session_id = p_session_id),0),
+    COALESCE((SELECT SUM(comp_profit_usdt)    FROM cin_aux.rt_move WHERE session_id = p_session_id),0),
+    (SELECT COALESCE(SUM(closing_profit),0)   FROM cin_aux.rt_balance WHERE session_id = p_session_id)
+      - (SELECT COALESCE(SUM(opening_profit),0) FROM cin_aux.rt_balance WHERE session_id = p_session_id)
+      - COALESCE((SELECT SUM(fee_usdt + slippage_usdt) FROM cin_aux.rt_move WHERE session_id = p_session_id),0),
+    COALESCE((SELECT SUM(trace_usdt)   FROM cin_aux.rt_move WHERE session_id = p_session_id),0),
+    COALESCE((SELECT SUM(dev_ref_usdt) FROM cin_aux.rt_move WHERE session_id = p_session_id),0),
+    COALESCE((SELECT SUM(closing_principal) FROM cin_aux.rt_balance WHERE session_id = p_session_id),0),
+    COALESCE((SELECT SUM(closing_profit)    FROM cin_aux.rt_balance WHERE session_id = p_session_id),0)
+  ON CONFLICT (session_id) DO UPDATE
+  SET imprint_principal_churn_usdt = EXCLUDED.imprint_principal_churn_usdt,
+      imprint_profit_churn_usdt    = EXCLUDED.imprint_profit_churn_usdt,
+      imprint_generated_profit_usdt= EXCLUDED.imprint_generated_profit_usdt,
+      imprint_trace_sum_usdt       = EXCLUDED.imprint_trace_sum_usdt,
+      imprint_devref_sum_usdt      = EXCLUDED.imprint_devref_sum_usdt,
+      luggage_total_principal_usdt = EXCLUDED.luggage_total_principal_usdt,
+      luggage_total_profit_usdt    = EXCLUDED.luggage_total_profit_usdt;
+
+  UPDATE cin_aux.rt_session SET ended_at = COALESCE(ended_at, now()), closed = TRUE WHERE session_id = p_session_id;
+END; $$;
+COMMIT;
+```
+
+---
+
+## 09_ops.sql
+
+```sql
+BEGIN;
+CREATE SCHEMA IF NOT EXISTS ops;
+DO $$ BEGIN CREATE TYPE ops.side   AS ENUM ('buy','sell'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE ops.status AS ENUM ('requested','placed','rejected','filled','cancelled','expired'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS ops.order (
+  order_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id uuid NOT NULL REFERENCES cin_aux.sessions(session_id) ON DELETE CASCADE,
+  symbol text NOT NULL,
+  side   ops.side NOT NULL,
+  qty    numeric(36,18) NOT NULL,
+  px     numeric(36,18),
+  kind   text NOT NULL DEFAULT 'market',
+  status ops.status NOT NULL DEFAULT 'requested',
+  paper  boolean NOT NULL DEFAULT true,
+  meta   jsonb NOT NULL DEFAULT '{}',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS ops.fill (
+  fill_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL REFERENCES ops.order(order_id) ON DELETE CASCADE,
+  symbol text NOT NULL,
+  qty    numeric(36,18) NOT NULL,
+  px     numeric(36,18) NOT NULL,
+  fee    numeric(36,18) NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+COMMIT;
+```
+
+---
+
+## 10_bootstrap_core.sql
+
+```sql
+BEGIN;
+-- Core analytical sources (from bootstrap):
+CREATE TABLE IF NOT EXISTS public.id_pct_pairs (
+  base TEXT NOT NULL,
+  quote TEXT NOT NULL,
+  id_pct DOUBLE PRECISION NOT NULL,
+  ts_epoch_ms BIGINT NOT NULL,
+  PRIMARY KEY (base, quote, ts_epoch_ms)
+);
+CREATE INDEX IF NOT EXISTS idx_idpct_pairs_bq_ts ON public.id_pct_pairs (base, quote, ts_epoch_ms DESC);
+
+CREATE OR REPLACE VIEW public.id_pct_latest AS
+SELECT DISTINCT ON (base, quote) base, quote, id_pct, ts_epoch_ms
+FROM public.id_pct_pairs
+ORDER BY base, quote, ts_epoch_ms DESC;
+
+CREATE TABLE IF NOT EXISTS public.metrics (
+  metric_key TEXT NOT NULL,
+  value DOUBLE PRECISION NOT NULL,
+  ts_epoch_ms BIGINT NOT NULL,
+  PRIMARY KEY (metric_key, ts_epoch_ms)
+);
+CREATE INDEX IF NOT EXISTS idx_metrics_key_ts ON public.metrics (metric_key, ts_epoch_ms DESC);
+
+CREATE TABLE IF NOT EXISTS public.balances (
+  asset TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  ts_epoch_ms BIGINT NOT NULL,
+  PRIMARY KEY (asset, ts_epoch_ms)
+);
+CREATE INDEX IF NOT EXISTS idx_balances_asset_ts ON public.balances (asset, ts_epoch_ms DESC);
+
+CREATE OR REPLACE VIEW public.wallet_balances_latest AS
+SELECT DISTINCT ON (asset) asset, amount, ts_epoch_ms
+FROM public.balances
+ORDER BY asset, ts_epoch_ms DESC;
+
+CREATE TABLE IF NOT EXISTS public.pair_availability (
+  base TEXT NOT NULL,
+  quote TEXT NOT NULL,
+  tradable BOOLEAN NOT NULL,
+  ts_epoch_ms BIGINT NOT NULL,
+  PRIMARY KEY (base, quote, ts_epoch_ms)
+);
+CREATE INDEX IF NOT EXISTS idx_availability_ts ON public.pair_availability (ts_epoch_ms DESC);
+COMMIT;
+```
+
+---
+
+## 11_views_latest.sql
+
+```sql
+BEGIN;
+-- STR latest vectors
+CREATE OR REPLACE VIEW str_aux.vectors_latest AS
+SELECT DISTINCT ON (symbol, window_label)
+  symbol, window_label, ts, v_inner, v_outer, spread, v_tendency, v_swap, summary
+FROM str_aux.vectors
+ORDER BY symbol, window_label, ts DESC;
+
+-- Matrices latest per type/symbol/window
+CREATE OR REPLACE VIEW matrices.latest AS
+SELECT DISTINCT ON (matrix, symbol, window_label)
+  matrix, symbol, window_label, ts, bins, values, summary
+FROM matrices.values_store
+ORDER BY matrix, symbol, window_label, ts DESC;
+
+-- CIN runtime reporting
+CREATE OR REPLACE VIEW cin_aux.v_rt_move_attrib AS
+SELECT m.move_id, m.session_id, m.ts, m.from_asset, m.to_asset,
+       m.executed_usdt, m.fee_usdt, m.slippage_usdt,
+       m.comp_principal_usdt, m.comp_profit_usdt,
+       m.trace_usdt, m.profit_consumed_usdt, m.principal_hit_usdt,
+       m.dev_ref_usdt, m.p_bridge_in_usdt, m.p_bridge_out_usdt, m.lot_units_used
+FROM cin_aux.rt_move m
+ORDER BY m.session_id, m.ts;
+
+CREATE OR REPLACE VIEW cin_aux.v_rt_session_rollup AS
+SELECT b.session_id,
+       SUM(b.opening_principal) AS opening_principal_usdt,
+       SUM(b.opening_profit)    AS opening_profit_usdt,
+       SUM(b.closing_principal) AS closing_principal_usdt,
+       SUM(b.closing_profit)    AS closing_profit_usdt
+FROM cin_aux.rt_balance b
+GROUP BY b.session_id;
+COMMIT;
+```

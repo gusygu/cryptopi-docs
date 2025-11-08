@@ -1,0 +1,166 @@
+/* src/app/globals.css  — Tailwind v3 entry */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- Base / global ---------- */
+@layer base {
+  :root { color-scheme: dark; }
+  html, body, :root { height: 100%; }
+
+  body {
+    /* fallback backdrop (legacy-neutral) */
+    @apply min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-800 text-zinc-100 antialiased;
+  }
+
+  table { border-collapse: separate; border-spacing: 0; }
+  th, td { white-space: nowrap; }
+}
+
+/* ---------- CryptoPi Theme (emerald + tinned silver) ---------- */
+.theme-cryptopi {
+  --cp-emerald-ink: #10b981;
+  --cp-emerald-ink-2: #059669;
+  --cp-silver-1: #d5d9e0;
+  --cp-silver-2: #aeb5bf;
+  --cp-silver-3: #6b7280;
+  --cp-silver-bg: #0b0d10;
+  --cp-panel: #0f1318;
+  --cp-border: rgba(168, 174, 186, 0.22);
+  --cp-border-strong: rgba(168, 174, 186, 0.35);
+}
+.theme-cryptopi body {
+  background-image:
+    radial-gradient(1200px 800px at 10% 0%, rgba(16,185,129,0.10), transparent 60%),
+    radial-gradient(900px 700px at 100% 100%, rgba(16,185,129,0.06), transparent 60%),
+    linear-gradient(to bottom right, #0a0c0f, #101419 35%, #0b0e13);
+  color: var(--cp-silver-1);
+}
+
+/* ---------- Components ---------- */
+@layer components {
+  .cp-card {
+    @apply rounded-xl p-3 backdrop-blur-sm;
+    background: color-mix(in oklab, var(--cp-panel) 92%, black);
+    border: 1px solid var(--cp-border);
+  }
+  .cp-pill { @apply px-2 py-[3px] rounded-md text-[11px] font-mono; border: 1px solid var(--cp-border); background: #0e1217; color: var(--cp-silver-1); }
+  .cp-pill-emerald { @apply px-2 py-[3px] rounded-md text-[11px] font-mono; border: 1px solid #065f46; background: color-mix(in oklab, #065f46 20%, #0b0f14); color: #a7f3d0; }
+  .cp-pill-silver { @apply px-2 py-[3px] rounded-md text-[11px] font-mono; border: 1px solid var(--cp-border-strong); background: #0e1217; color: var(--cp-silver-2); }
+  .btn { @apply inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors border; }
+  .btn-emerald {
+    border-color: color-mix(in oklab, var(--cp-emerald-ink-2) 35%, black);
+    background: color-mix(in oklab, var(--cp-emerald-ink) 18%, #0d1318);
+    color: #eafff7;
+  }
+  .btn-emerald:hover { background: color-mix(in oklab, var(--cp-emerald-ink) 28%, #0d1318); }
+  .btn-silver {
+    border-color: var(--cp-border-strong);
+    background: #0f141a;
+    color: var(--cp-silver-1);
+  }
+  .btn-silver:hover { background: #121921; }
+  .cp-h1 { @apply text-xl md:text-2xl font-semibold; color: var(--cp-silver-1); }
+  .cp-subtle { color: color-mix(in oklab, var(--cp-silver-2) 80%, #9ca3af); }
+}
+
+/* ---------- Utilities ---------- */
+@layer utilities {
+  .cp-border { border: 1px solid var(--cp-border); }
+  .cp-border-strong { border: 1px solid var(--cp-border-strong); }
+  .cp-maxw { @apply w-full max-w-[1400px] mx-auto; }
+}
+
+/* ---------- Legacy theme (opt-in) ---------- */
+.theme-legacy {
+  --bg: #0b1020;
+  --fg: #e7ecf6;
+  --panel: #0f172a;
+  --panel-2: #0b1327;
+  --border: #1f2a44;
+  --text: #e7ecf6;
+  --muted: #8ea1c2;
+  --accent-1: #9c5fff;
+  --accent-2: #3be381;
+  --accent-3: #f472b6;
+}
+.theme-legacy body { background: var(--bg); color: var(--fg); }
+
+/* === numeric font utilities ============================================== */
+:root {
+  --cp-bg-950: #0b1220;
+  --cp-card-900: #111a2b;
+  --cp-grad-a: #00c2ff;
+  --cp-grad-b: #00f5a0;
+  --cp-grad-c: #ffb86b;
+}
+.num { font-family: var(--font-num), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+.num-tabular { font-variant-numeric: tabular-nums lining-nums; }
+
+/* ---- Matrix gradient surface ---- */
+.cp-gradient {
+  background:
+    radial-gradient(120% 120% at 0% 0%, color-mix(in oklab, var(--cp-grad-a) 15%, transparent) 0%, transparent 60%),
+    radial-gradient(120% 120% at 100% 0%, color-mix(in oklab, var(--cp-grad-b) 12%, transparent) 0%, transparent 65%),
+    radial-gradient(120% 120% at 100% 100%, color-mix(in oklab, var(--cp-grad-c) 10%, transparent) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(17,26,43,0.92) 0%, rgba(11,18,32,0.96) 70%, rgba(11,18,32,1) 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 8px 24px rgba(0,0,0,0.45);
+  border-radius: 12px;
+}
+.matrix-card { padding: 12px; }
+html, body { background-color: var(--cp-bg-950); }
+
+/* --- STR-AUX page heat background (mirrors matrices fade) --- */
+.page-heat-bg::before,
+.page-heat-bg::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+.page-heat-bg::before {
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(56,189,248,.08), transparent 55%),
+    radial-gradient(1000px 600px at 80% 110%, rgba(129,140,248,.08), transparent 60%),
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  opacity: .9;
+}
+.page-heat-bg::after {
+  background-image:
+    radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+  opacity: .35;
+}
+
+/* --- 3-up grid for panels --- */
+.str-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem; /* 20px */
+}
+@media (min-width: 1280px) { /* xl */
+  .str-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* --- unified panel chrome (same glass look as matrices) --- */
+.str-panel {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025)),
+    linear-gradient(120deg, rgba(56,189,248,.10), rgba(129,140,248,.06));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(30,41,59,.7);         /* slate-800/70 */
+  border-radius: 1rem;                          /* 16px */
+  padding: 1rem;                                /* 16px (outer) */
+}
+
+/* typography harmony */
+.str-panel, .str-grid { font-feature-settings: "tnum"; }
+.str-panel .tiny { font-size: 11px; line-height: 1.15; color: rgb(148 163 184); } /* slate-400 */
+.str-panel .small { font-size: 12px; }
+.str-panel .num { font-variant-numeric: tabular-nums; }

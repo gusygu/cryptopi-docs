@@ -1,0 +1,2 @@
+-- 26_dynamic_symbols.sql has been merged into 06_compat_legacy.sql.
+-- Run src/core/db/ddl/06_compat_legacy.sql for the combined DDL.

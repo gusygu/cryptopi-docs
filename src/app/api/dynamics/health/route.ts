@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from "next/server";
+import "@/app/(server)/wire-converter";
+import { buildDynamicsSnapshot } from "@/core/converters/Converter.server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const ensureUpper = (value: string | null | undefined) => String(value ?? "").trim().toUpperCase();
+
+const parseCsv = (value: string | null | undefined) => {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((s) => ensureUpper(s))
+    .filter(Boolean);
+};
+
+export async function GET(req: NextRequest) {
+  const url = req.nextUrl;
+  const base = ensureUpper(url.searchParams.get("base") ?? "BTC");
+  const quote = ensureUpper(url.searchParams.get("quote") ?? "USDT");
+
+  if (!base || !quote) {
+    return NextResponse.json(
+      { ok: false, error: "missing_base_or_quote" },
+      { status: 400, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
+  const coinsParam = parseCsv(url.searchParams.get("coins"));
+  const coins = Array.from(
+    new Set([base, quote, ...(coinsParam.length ? coinsParam : (process.env.NEXT_PUBLIC_COINS ?? "BTC,ETH,BNB,SOL,ADA,XRP,USDT").split(",").map(ensureUpper))])
+  );
+
+  const candidates = coins.filter((c) => c !== base && c !== quote).slice(0, 16);
+  const histLen = Number(url.searchParams.get("histLen"));
+
+  try {
+    const snapshot = await buildDynamicsSnapshot({
+      base,
+      quote,
+      Ca: base,
+      Cb: quote,
+      coinsUniverse: coins,
+      candidates,
+      histLen: Number.isFinite(histLen) ? histLen : 48,
+      histogramBins: 48,
+    });
+
+    const summary = {
+      coins: snapshot.coins.length,
+      arbRows: snapshot.arb.rows.length,
+      wallets: Object.keys(snapshot.wallets).length,
+      builtAt: snapshot.builtAt,
+     mea: snapshot.metrics.mea.value,
+    };
+
+    return NextResponse.json(
+      {
+        ok: true,
+        summary,
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err?.message ?? String(err) },
+      { status: 500, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+}
