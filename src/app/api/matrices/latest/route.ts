@@ -14,6 +14,7 @@ import {
 } from "@/core/maths/math";
 import { fetchOpeningGridFromView } from "@/core/features/matrices/opening";
 import { resolveCoinsFromSettings } from "@/lib/settings/server";
+import { fetchPairUniverseCoins } from "@/lib/settings/coin-universe";
 // typed downstream import from matrices frozen helpers (no runtime impact)
 import type {
   FrozenPairKey,
@@ -83,11 +84,11 @@ async function coinsFromCookiesOrHeaders(): Promise<string[] | null> {
 async function resolveCoinsUniverse(preferred: string[] | null): Promise<string[]> {
   if (preferred && preferred.length) return coinsAddUSDTFirst(preferred);
 
-  const legacy = await coinsFromCookiesOrHeaders();
-  if (legacy?.length) return coinsAddUSDTFirst(legacy);
-
   const fromSettings = await resolveCoinsFromSettings();
   if (fromSettings.length) return coinsAddUSDTFirst(fromSettings);
+
+  const legacy = await coinsFromCookiesOrHeaders();
+  if (legacy?.length) return coinsAddUSDTFirst(legacy);
 
   return ["USDT"];
 }
@@ -221,11 +222,14 @@ export async function buildMatricesLatestPayload(
       ? normalizeCoins(params.coins)
       : null;
 
-    const coins = await resolveCoinsUniverse(
+    const preferCoins =
       queryCoinsNormalized && queryCoinsNormalized.length
         ? queryCoinsNormalized
-        : null
-    );
+        : null;
+    const resolvedCoins = await resolveCoinsUniverse(preferCoins);
+    const viewCoins =
+      preferCoins == null ? await fetchPairUniverseCoins() : [];
+    const coins = normalizeCoins([...resolvedCoins, ...viewCoins]);
 
     if (!coins.length) {
       throw new Error("No coins resolved for matrices universe");

@@ -139,7 +139,7 @@ async function retrievalSuite(){
     ["/api/matrices/latest", j => Array.isArray(j) && j.length>0],
     ["/api/matrices/server", j => looks(j)],
     ["/api/cin-aux", j => j!=null],
-    ["/api/mea-aux", j => j!=null],
+    ["/api/moo-aux", j => j!=null],
     ["/api/str-aux/latest", j => looks(j) || (Array.isArray(j)&&j.length)],
     ["/api/str-aux/matrix", j => j!=null],
     ["/api/preview/universe/symbols", j => Array.isArray(j)||looks(j)],
@@ -165,3 +165,4 @@ async function retrievalSuite(){
     ok("Server Doctor ✓");
   } catch(e) { fail("Server Doctor", e); }
 })();
+

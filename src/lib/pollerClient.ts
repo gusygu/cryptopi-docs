@@ -6,6 +6,7 @@ type Phase = 1 | 2 | 3;
 export type PollerConfig = {
   cycle40: number;   // seconds, default 40
   cycle120: number;  // seconds, default 120
+  refreshUrl: string;
 };
 
 export type PollerState = {
@@ -44,12 +45,13 @@ const TAB_ID = (() => {
 const LS_KEY = "cryptopi:poller:leader";
 const BC_NAME = "cryptopi-poller";
 
-const FALLBACK_CONFIG: PollerConfig = { cycle40: 40, cycle120: 120 };
+const FALLBACK_CONFIG: PollerConfig = { cycle40: 40, cycle120: 120, refreshUrl: "/api/system/refresh" };
 
 type RawPollerConfig = {
   poll?: Partial<PollerConfig> | null;
   cycle40?: unknown;
   cycle120?: unknown;
+  refreshUrl?: unknown;
 } | null | undefined;
 
 class ClientPoller {
@@ -61,6 +63,7 @@ class ClientPoller {
   private lastSec = nowSec();
 
   private config: PollerConfig = { ...FALLBACK_CONFIG };
+  private refreshPromise: Promise<void> | null = null;
 
   private state: PollerState = {
     enabled: true,
@@ -114,8 +117,13 @@ class ClientPoller {
     const pollSection = raw?.poll ?? {};
     const cycle40 = resolveNumber(pollSection?.cycle40 ?? raw?.cycle40, FALLBACK_CONFIG.cycle40);
     const cycle120 = resolveNumber(pollSection?.cycle120 ?? raw?.cycle120, FALLBACK_CONFIG.cycle120);
+    const refreshUrlRaw = (pollSection as any)?.refreshUrl ?? raw?.refreshUrl;
+    const refreshUrl =
+      typeof refreshUrlRaw === "string" && refreshUrlRaw.trim().length
+        ? refreshUrlRaw.trim()
+        : FALLBACK_CONFIG.refreshUrl;
 
-    return { cycle40, cycle120 };
+    return { cycle40, cycle120, refreshUrl };
   }
 
   private async loadConfigFromSettings() {
@@ -151,6 +159,7 @@ class ClientPoller {
     const merged: PollerConfig = {
       cycle40: cfg.cycle40 ?? this.config.cycle40,
       cycle120: cfg.cycle120 ?? this.config.cycle120,
+      refreshUrl: cfg.refreshUrl ?? this.config.refreshUrl,
     };
     this.applyConfigInternal(merged, /*initial*/ false);
   }
@@ -258,6 +267,9 @@ class ClientPoller {
         this.state.remaining120 = this.state.dur120;
         this.broadcast({ type: "tick120" });
         this.emit({ type: "tick120" });
+        if (this.leader && this.state.enabled) {
+          this.ensureRefresh("auto");
+        }
       }
     }
     this.broadcast({ type: "state", state: this.state });
@@ -273,12 +285,14 @@ class ClientPoller {
         const s = ev.state;
         this.state = { ...s, isLeader: false };
         // sync config durations from state (followers rely on leader)
-        this.config = { cycle40: s.dur40, cycle120: s.dur120 };
+        this.config = { ...this.config, cycle40: s.dur40, cycle120: s.dur120 };
       }
     } else if (ev.type === "config") {
       if (!this.leader) {
         this.applyConfigInternal(ev.config, /*initial*/ false);
       }
+    } else if (ev.type === "refresh") {
+      if (this.leader) this.ensureRefresh("broadcast");
     }
     this.emit(ev);
     if (!this.leader) this.electLeader();
@@ -303,12 +317,16 @@ class ClientPoller {
     this.broadcast({ type: "state", state: this.state });
     this.emit({ type: "state", state: this.state });
   }
-  requestRefresh() { this.broadcast({ type: "refresh" }); this.emit({ type: "refresh" }); }
+  requestRefresh() {
+    this.broadcast({ type: "refresh" });
+    this.emit({ type: "refresh" });
+    this.ensureRefresh("manual");
+  }
   setFetching(on: boolean) {
     this.state.isFetching = on;
-    this.broadcast({ type: on ? "fetch:start" : "fetch:success", ts: Date.now() });
     this.broadcast({ type: "state", state: this.state });
     this.emit({ type: "state", state: this.state });
+    if (on) this.broadcast({ type: "fetch:start", ts: Date.now() });
   }
   setLastOkTs(ts: number) {
     this.state.lastOkTs = ts;
@@ -322,6 +340,37 @@ class ClientPoller {
     this.state.dbActivity = clamped;
     this.broadcast({ type: "state", state: this.state });
     this.emit({ type: "state", state: this.state });
+  }
+
+  private ensureRefresh(reason: "auto" | "manual" | "broadcast") {
+    if (!this.leader || !this.state.enabled) return;
+    if (this.refreshPromise) return;
+    const url = this.config.refreshUrl || FALLBACK_CONFIG.refreshUrl;
+    this.refreshPromise = (async () => {
+      this.setFetching(true);
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ reason, pollerId: "client" }),
+        });
+        if (!res.ok) {
+          throw new Error(`refresh ${res.status} ${res.statusText}`);
+        }
+        const payload = await res.json().catch(() => ({}));
+        if (payload?.ok === false) {
+          throw new Error(String(payload?.error ?? "refresh failed"));
+        }
+        this.broadcast({ type: "fetch:success", ts: Date.now() });
+        this.setLastOkTs(Date.now());
+      } catch (err) {
+        this.broadcast({ type: "fetch:error", ts: Date.now() });
+        console.warn("[poller] refresh error", err);
+      } finally {
+        this.setFetching(false);
+        this.refreshPromise = null;
+      }
+    })();
   }
 }
 

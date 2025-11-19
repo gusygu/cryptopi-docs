@@ -1,7 +1,4 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/market/ingest/klines/route": "app/api/market/ingest/klines/route.js",
-  "/api/matrices/route": "app/api/matrices/route.js",
-  "/api/settings/route": "app/api/settings/route.js",
-  "/api/str-aux/vectors/route": "app/api/str-aux/vectors/route.js"
+  "/matrices/page": "app/matrices/page.js",
+  "/str-aux/page": "app/str-aux/page.js"
 }

@@ -48,7 +48,7 @@ async function checkDB(){
 }
 
 async function checkAPIs(){
-  const tryList = ["/api/mea-aux","/api/str-aux/latest"];
+  const tryList = ["/api/moo-aux","/api/str-aux/latest"];
   let okAny=false;
   for (const p of tryList){
     const r = await httpJSON("GET", p);
@@ -66,3 +66,4 @@ async function checkAPIs(){
     process.exit(0);
   }catch(e){ fail("MEA project smoke", e); }
 })();
+

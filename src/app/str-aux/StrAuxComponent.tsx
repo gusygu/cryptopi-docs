@@ -13,16 +13,24 @@ type VectorRow = {
   symbol: string;
   window: string;
   bins: number;
+  scale?: number;
+  samples?: number;
   payload: {
-    vInner?: number;
-    vOuter?: number;
-    spread?: number;
+    vInner?: number | null;
+    vOuter?: number | null;
+    spread?: number | null;
     vTendency?: {
-      score?: number;
-      direction?: number;
-      strength?: number;
-      slope?: number;
-      r?: number;
+      score?: number | null;
+      direction?: number | null;
+      strength?: number | null;
+      slope?: number | null;
+      r?: number | null;
+    } | null;
+    vSwap?: {
+      score?: number | null;
+      quartile?: number | null;
+      q1?: number | null;
+      q3?: number | null;
     };
   };
   created_ts: string;
@@ -58,8 +66,8 @@ export default function StrAuxClient({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    const vecUrl = `${base}/vectors?window=${encodeURIComponent(win)}`;
-    const staUrl = `${base}/stats?window=${encodeURIComponent(win)}`;
+    const vecUrl = `${base}/vectors?window=${encodeURIComponent(win)}&bins=${bins}`;
+    const staUrl = `${base}/stats?window=${encodeURIComponent(win)}&bins=${bins}`;
     setLoading(true);
     setErrorMsg(null);
 
@@ -73,8 +81,12 @@ export default function StrAuxClient({
         const vData: Record<string, VectorRow> = {};
         const sData: Record<string, StatRow> = {};
 
-        (vJson?.vectors || []).forEach((r: VectorRow) => (vData[r.symbol] = r));
-        (sJson?.stats || []).forEach((r: StatRow) => (sData[r.symbol] = r));
+        normalizeVectorRows(vJson, win, bins).forEach((row) => {
+          if (row?.symbol) vData[row.symbol] = row;
+        });
+        normalizeStatRows(sJson, win).forEach((row) => {
+          if (row?.symbol) sData[row.symbol] = row;
+        });
 
         setVectors(vData);
         setStats(sData);
@@ -179,4 +191,100 @@ export default function StrAuxClient({
       </div>
     </div>
   );
+}
+
+const toNumberOrNull = (value: unknown): number | null => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+function normalizeVectorRows(data: any, win: string, bins: number): VectorRow[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.vectors)) return data.vectors;
+  if (data?.vectors && typeof data.vectors === 'object') {
+    return Object.entries(data.vectors).map(([symbol, entry]: [string, any]) => {
+      const samplesValue =
+        typeof entry?.samples === 'number'
+          ? Number(entry.samples)
+          : typeof entry?.summary?.samples === 'number'
+          ? Number(entry.summary.samples)
+          : undefined;
+      return {
+        symbol,
+        window: entry?.window ?? data.window ?? win,
+        bins: Number(entry?.bins ?? data.bins ?? bins),
+        scale: entry?.scale ?? data.scale,
+        samples: samplesValue,
+        payload: entry?.payload ?? coerceVectorPayload(entry),
+        created_ts: entry?.created_ts ?? new Date().toISOString(),
+      };
+    });
+  }
+  return [];
+}
+
+function coerceVectorPayload(entry: any): VectorRow['payload'] {
+  const summary = entry?.summary ?? {};
+  const metrics = summary?.tendency?.metrics ?? entry?.vTendency ?? {};
+  const payload: VectorRow['payload'] = {
+    vInner: toNumberOrNull(entry?.vInner ?? summary?.inner?.scaled),
+    vOuter: toNumberOrNull(entry?.vOuter ?? summary?.outer?.scaled),
+    spread: toNumberOrNull(entry?.spread),
+    vTendency: entry?.vTendency ?? {
+      score: toNumberOrNull(metrics?.score),
+      direction: toNumberOrNull(metrics?.direction),
+      strength: toNumberOrNull(metrics?.strength),
+      slope: toNumberOrNull(metrics?.slope),
+      r: toNumberOrNull(metrics?.r),
+    },
+    vSwap: entry?.vSwap ?? (summary?.swap
+      ? {
+          score: toNumberOrNull(summary.swap?.score),
+          quartile: toNumberOrNull(summary.swap?.Q),
+          q1: toNumberOrNull(summary.swap?.q1),
+          q3: toNumberOrNull(summary.swap?.q3),
+        }
+      : undefined),
+  };
+  if (
+    payload.vTendency &&
+    payload.vTendency.score == null &&
+    payload.vTendency.direction == null &&
+    payload.vTendency.strength == null &&
+    payload.vTendency.slope == null &&
+    payload.vTendency.r == null
+  ) {
+    payload.vTendency = null;
+  }
+  return payload;
+}
+
+function normalizeStatRows(data: any, win: string): StatRow[] {
+  if (!data) return [];
+  if (Array.isArray(data?.stats)) return data.stats;
+  const out = data?.out;
+  if (!out || typeof out !== 'object') return [];
+  const rows: StatRow[] = [];
+  for (const [symbol, entry] of Object.entries(out)) {
+    if (!entry || typeof entry !== 'object') continue;
+    const payload = (entry as any).payload ?? {
+      gfm: toNumberOrNull((entry as any)?.fm?.gfm_price ?? (entry as any)?.fm?.gfm_calc_price),
+      gfm_pct: toNumberOrNull((entry as any)?.gfmDelta?.absPct),
+      price: toNumberOrNull((entry as any)?.cards?.live?.benchmark),
+      shift: toNumberOrNull((entry as any)?.shifts ?? (entry as any)?.shift_stamp),
+      day: toNumberOrNull((entry as any)?.cards?.live?.pct24h),
+      drv: toNumberOrNull((entry as any)?.streams?.pct_drv?.cur),
+      opening: toNumberOrNull((entry as any)?.cards?.opening?.benchmark),
+      min: toNumberOrNull((entry as any)?.sessionStats?.priceMin),
+      max: toNumberOrNull((entry as any)?.sessionStats?.priceMax),
+    };
+    rows.push({
+      symbol,
+      window: (entry as any)?.window ?? data.window ?? win,
+      payload,
+      created_ts: new Date(Number((entry as any)?.lastUpdateTs ?? data.ts ?? Date.now())).toISOString(),
+    });
+  }
+  return rows;
 }

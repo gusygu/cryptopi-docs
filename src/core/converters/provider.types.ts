@@ -42,7 +42,7 @@ export interface CinAuxProvider {
   getCinForCoins(symbols: string[]): Promise<Record<string, CinStat>> | Record<string, CinStat>;
 }
 
-export interface MeaAuxProvider {
+export interface MooAuxProvider {
   getMea(pair: Pair): Promise<{ value: number; tier: string }> | { value: number; tier: string };
   getMeaGrid?(
     input: { coins: string[]; idPct: number[][]; balances: Record<string, number>; k?: number }
@@ -67,7 +67,7 @@ export interface WalletHttpProvider {
 
 export type ConverterSources = {
   matrices: MatricesProvider;
-  mea: MeaAuxProvider;
+  mea: MooAuxProvider;
   str: StrAuxProvider;
   cin: CinAuxProvider;
   wallet?: WalletHttpProvider;

@@ -62,7 +62,7 @@ export async function liveFromSources(requestedCoins: string[]) {
       }
     } as const;
   }
-
+  
   // Step 4: Bulk fetch once using your helper (kept unchanged)
   const arr = await fetch24hAll(symbols);
   const by  = mapTickerBySymbol(arr);

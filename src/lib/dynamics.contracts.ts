@@ -11,7 +11,7 @@ export type TsKey = MatrixKey;
 
 export type MatricesPayload = MatricesResponse;
 
-export type MeaResp = { ok: boolean; grid?: Grid };
+export type MooResp = { ok: boolean; grid?: Grid };
 
 export type PreviewResp = { ok: boolean; symbols?: string[] };
 

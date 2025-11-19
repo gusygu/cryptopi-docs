@@ -82,7 +82,7 @@ export type StrAuxBinsResponse = {
   timing?: StrAuxTiming;
 };
 
-type MarketPoint = { ts: number; price: number; volume: number };
+export type MarketPoint = { ts: number; price: number; volume: number };
 
 type SymbolContext = {
   symbol: string;

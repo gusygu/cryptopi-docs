@@ -1,44 +1,21 @@
 // src/app/api/market/ingest/ticker/route.ts
 import { NextResponse } from "next/server";
-import { db } from "@/core/db/server";
+import { fetchCoinUniverseEntries } from "@/lib/settings/coin-universe";
+import { ingestTickerSymbols } from "@/core/system/tasks";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
-async function fetchTickerPrice(symbol: string) {
-  const res = await fetch(
-    `https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`,
-    { cache: "no-store" }
-  );
-  if (!res.ok) throw new Error(`ticker ${symbol}: ${res.status}`);
-  return res.json() as Promise<{ symbol: string; price: string }>;
-}
-
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  // If the client doesn’t pass symbols, use the UI-enabled universe from DB
   const symbols: string[] =
     body?.symbols ??
-    (
-      await db.query<{ symbol: string }>(
-        `select symbol from settings.coin_universe where enabled = true`
-      )
-    ).rows.map(r => r.symbol);
+    (await fetchCoinUniverseEntries({ onlyEnabled: true })).map((entry) => entry.symbol);
 
-  // Pull + upsert
-  for (const s of symbols) {
-    const payload = await fetchTickerPrice(s);
-    await db.query(`select market.apply_ticker_from_payload($1,$2::jsonb)`, [
-      s,
-      JSON.stringify(payload),
-    ]);
+  if (!symbols.length) {
+    console.warn("[market/ticker] no symbols resolved from coin universe");
+    return NextResponse.json({ ok: false, error: "no symbols resolved" }, { status: 400 });
   }
 
-  // Read back the current latest
-  const { rows: latest } = await db.query(
-    `select symbol, ts, price, meta from market.ticker_latest
-     where symbol = any($1::text[]) order by symbol`,
-    [symbols]
-  );
-
-  return NextResponse.json({ ok: true, wrote: symbols.length, latest }, { headers: NO_STORE });
+  const wrote = await ingestTickerSymbols(symbols);
+  return NextResponse.json({ ok: true, wrote }, { headers: NO_STORE });
 }

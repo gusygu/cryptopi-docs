@@ -3,7 +3,7 @@
 
 import { wireConverterSources } from "@/core/converters/Converter.server";
 import { makeMatricesHttpProvider } from "@/core/converters/providers/matrices.http"; // ← NEW: HTTP provider
-import { makeMeaModuleProvider } from "@/core/converters/providers/meaaux.module";
+import { makeMooModuleProvider } from "@/core/converters/providers/mooaux.module";
 import { makeStrDbProvider } from "@/core/converters/providers/straux.db";
 import { makeCinDbProvider } from "@/core/converters/providers/cinaux.db";
 import { makeWalletHttpProvider } from "@/core/converters/providers/wallet.http";
@@ -13,11 +13,11 @@ const APP_SESSION = process.env.NEXT_PUBLIC_APP_SESSION_ID || "dev-session";
 const STR_WINDOW: "30m" | "1h" | "3h" =
   (process.env.NEXT_PUBLIC_STR_WINDOW as any) || "30m";
 
-// ── mea-aux (module) ────────────────────────────────────────────────────────────
+// ── moo-aux (module) ────────────────────────────────────────────────────────────
 import { getTierWeighting } from "../../../lab/legacy/auxiliary/mea_aux/tiers";
 import { getLatestTsForType, getSnapshotByType } from "@/core/db";
 
-async function mea_getMeaForPair(pair: { base: string; quote: string }) {
+async function moo_getAuxForPair(pair: { base: string; quote: string }) {
   const coins = (process.env.COINS ?? "BTC,ETH,BNB,SOL,ADA,USDT")
     .split(",")
     .map((s) => s.trim().toUpperCase());
@@ -38,9 +38,9 @@ async function mea_getMeaForPair(pair: { base: string; quote: string }) {
   return { value: weight, tier };
 }
 
-const meaProvider = makeMeaModuleProvider({ getMeaForPair: mea_getMeaForPair }) as any;
+const mooProvider = makeMooModuleProvider({ getMooForPair: moo_getAuxForPair }) as any;
 // (optional) attach grid if/when you have a canonical builder:
-// meaProvider.getMeaGrid = (...args) => /* buildMeaAux(...) */;
+// mooProvider.getMeaGrid = (...args) => /* buildMeaAux(...) */;
 
 // ── str-aux (db) ────────────────────────────────────────────────────────────────
 import { db as strAuxDb } from "@/lib/str-aux/db";
@@ -230,7 +230,7 @@ strProvider.getStats           = str_getStats;
 wireConverterSources({
   // Matrices now come from the HTTP endpoint keyed by the Settings universe
   matrices: makeMatricesHttpProvider(process.env.NEXT_PUBLIC_BASE_URL ?? ""),
-  mea:      meaProvider,
+  mea:      mooProvider,
   str:      strProvider,
   cin:      makeCinDbProvider({
               getWallet:   (s) => cin_getWallet(s),
@@ -238,3 +238,6 @@ wireConverterSources({
             }),
   wallet:   makeWalletHttpProvider(),
 });
+
+
+

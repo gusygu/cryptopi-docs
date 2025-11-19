@@ -18,7 +18,7 @@ async function findPage(){
   return null;
 }
 async function findAPI(){
-  const apis = [OVERRIDE_API, "/api/mea-aux","/api/str-aux/latest"].filter(Boolean);
+  const apis = [OVERRIDE_API, "/api/moo-aux","/api/str-aux/latest"].filter(Boolean);
   for (const a of apis){ const r = await getJSON(a); if (r.ok && r.json!=null) return {a,r}; }
   return null;
 }
@@ -35,3 +35,4 @@ async function findAPI(){
     process.exit(0);
   }catch(e){ fail("MEA client smoke", e); }
 })();
+

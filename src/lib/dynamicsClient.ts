@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { subscribe } from "@/lib/pollerClient";
 import { useSettings } from "@/lib/settings/provider";
 import type {
-  Coins, Grid, MatricesPayload, MeaResp, PreviewResp, StrBinsResp,
+  Coins, Grid, MatricesPayload, MooResp, PreviewResp, StrBinsResp,
   PairMarket, StrAuxMetrics,
 } from "@/lib/dynamics.contracts";
 
@@ -23,7 +23,7 @@ export { useDomainVM, toArbTableInput, toMetricsPanel } from "@/core/converters/
 /* ───────────── Routes registry ───────────── */
 const ROUTES = {
   matricesLatest: "/api/matrices/latest",
-  meaAux: "/api/mea-aux",
+  mooAux: "/api/moo-aux",
   preview: "/api/market/providers/binance/preview",
   strBins: "/api/str-aux/bins",
 };
@@ -56,17 +56,17 @@ export async function fetchMatricesLatest(coins?: Coins, signal?: AbortSignal): 
   return j;
 }
 
-export async function fetchMeaGrid(coins: Coins, signal?: AbortSignal): Promise<Grid | undefined> {
-  const key = `mea:${coins.join(",")}`;
+export async function fetchMooGrid(coins: Coins, signal?: AbortSignal): Promise<Grid | undefined> {
+  const key = `moo:${coins.join(",")}`;
   const hit = getCached<Grid | undefined>(key);
   if (hit) return hit;
 
-  const url = new URL(ROUTES.meaAux, window.location.origin);
+  const url = new URL(ROUTES.mooAux, window.location.origin);
   if (coins?.length) url.searchParams.set("coins", coins.join(","));
   Object.entries(nowQ()).forEach(([k, v]) => url.searchParams.set(k, v));
   const r = await fetch(url, { cache: "no-store", signal });
   if (!r.ok) return undefined;
-  const j = (await r.json()) as MeaResp;
+  const j = (await r.json()) as MooResp;
   const g = j?.grid;
   setCached(key, g);
   return g;
@@ -149,8 +149,8 @@ export function useMeaGrid(coins: Coins) {
   const load = async () => {
     if (!coins?.length) return;
     const ac = new AbortController();
-    try { setLoading(true); setError(null); setGrid(await fetchMeaGrid(coins, ac.signal)); }
-    catch (e: any) { setError(e?.message ?? "mea-aux fetch failed"); setGrid(undefined); }
+    try { setLoading(true); setError(null); setGrid(await fetchMooGrid(coins, ac.signal)); }
+    catch (e: any) { setError(e?.message ?? "moo-aux fetch failed"); setGrid(undefined); }
     finally { setLoading(false); ac.abort(); }
   };
 

@@ -418,26 +418,26 @@ export default function DynamicsPage() {
         matrixUrl.searchParams.set("quote", selected.quote);
         if (params) matrixUrl.searchParams.set("coins", params);
 
-        const meaUrl = new URL("/api/mea-aux", window.location.origin);
-        if (params) meaUrl.searchParams.set("coins", params);
+        const mooUrl = new URL("/api/moo-aux", window.location.origin);
+        if (params) mooUrl.searchParams.set("coins", params);
 
-        const [matricesRes, meaRes] = await Promise.all([
+        const [matricesRes, mooRes] = await Promise.all([
           fetch(matrixUrl.toString(), { cache: "no-store", signal: controller.signal }),
-          fetch(meaUrl.toString(), { cache: "no-store", signal: controller.signal }),
+          fetch(mooUrl.toString(), { cache: "no-store", signal: controller.signal }),
         ]);
 
         if (!matricesRes.ok) throw new Error(`/api/matrices/latest ${matricesRes.status}`);
-        if (!meaRes.ok) throw new Error(`/api/mea-aux ${meaRes.status}`);
+        if (!mooRes.ok) throw new Error(`/api/moo-aux ${mooRes.status}`);
 
         const matricesJson = (await matricesRes.json()) as MatricesLatestPayload;
         if (!matricesJson.ok) throw new Error(matricesJson.error ?? "matrices latest error");
 
-        const meaJson = (await meaRes.json()) as {
+        const mooJson = (await mooRes.json()) as {
           ok: boolean;
           grid?: MatrixValues;
           error?: string;
         };
-        if (!meaJson.ok) throw new Error(meaJson.error ?? "mea-aux error");
+        if (!mooJson.ok) throw new Error(mooJson.error ?? "moo-aux error");
 
         const universeRaw = Array.isArray(matricesJson.meta?.universe)
           ? (matricesJson.meta!.universe as string[])
@@ -455,7 +455,7 @@ export default function DynamicsPage() {
         const pct24Grid = valuesToGrid(matrixCoins, matricesJson.matrices?.pct24h?.values);
         const refGrid = valuesToGrid(matrixCoins, matricesJson.matrices?.ref?.values);
         const idPctGrid = valuesToGrid(matrixCoins, matricesJson.matrices?.id_pct?.values);
-        const meaGrid = valuesToGrid(matrixCoins, meaJson.grid ?? {});
+        const meaGrid = valuesToGrid(matrixCoins, mooJson.grid ?? {});
         const frozenGrid = (matricesJson.matrices?.benchmark?.flags as any)?.frozen as boolean[][] | undefined;
         const payloadSymbols = Array.isArray(matricesJson.symbols)
           ? matricesJson.symbols.map((sym) => ensureUpper(sym)).filter(Boolean)

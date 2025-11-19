@@ -341,6 +341,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/mea-aux">
 }
 
+// Validate ../../src/app/api/moo-aux/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/moo-aux/route.js")
+  handler satisfies RouteHandlerConfig<"/api/moo-aux">
+}
+
 // Validate ../../src/app/api/ops/place/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/ops/place/route.js")
@@ -371,18 +377,6 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/settings/wallet">
 }
 
-// Validate ../../src/app/api/str-aux/bins/route.ts
-{
-  const handler = {} as typeof import("../../src/app/api/str-aux/bins/route.js")
-  handler satisfies RouteHandlerConfig<"/api/str-aux/bins">
-}
-
-// Validate ../../src/app/api/str-aux/ingest/route.ts
-{
-  const handler = {} as typeof import("../../src/app/api/str-aux/ingest/route.js")
-  handler satisfies RouteHandlerConfig<"/api/str-aux/ingest">
-}
-
 // Validate ../../src/app/api/str-aux/latest/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/str-aux/latest/route.js")
@@ -395,46 +389,52 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/str-aux">
 }
 
-// Validate ../../src/app/api/str-aux/samples/route.ts
-{
-  const handler = {} as typeof import("../../src/app/api/str-aux/samples/route.js")
-  handler satisfies RouteHandlerConfig<"/api/str-aux/samples">
-}
-
-// Validate ../../src/app/api/str-aux/sampling/points/cycle/route.ts
-{
-  const handler = {} as typeof import("../../src/app/api/str-aux/sampling/points/cycle/route.js")
-  handler satisfies RouteHandlerConfig<"/api/str-aux/sampling/points/cycle">
-}
-
-// Validate ../../src/app/api/str-aux/sampling/points/cycle/window/route.ts
-{
-  const handler = {} as typeof import("../../src/app/api/str-aux/sampling/points/cycle/window/route.js")
-  handler satisfies RouteHandlerConfig<"/api/str-aux/sampling/points/cycle/window">
-}
-
-// Validate ../../src/app/api/str-aux/sampling/points/route.ts
-{
-  const handler = {} as typeof import("../../src/app/api/str-aux/sampling/points/route.js")
-  handler satisfies RouteHandlerConfig<"/api/str-aux/sampling/points">
-}
-
-// Validate ../../src/app/api/str-aux/sampling/route.ts
-{
-  const handler = {} as typeof import("../../src/app/api/str-aux/sampling/route.js")
-  handler satisfies RouteHandlerConfig<"/api/str-aux/sampling">
-}
-
-// Validate ../../src/app/api/str-aux/sampling/store/route.ts
-{
-  const handler = {} as typeof import("../../src/app/api/str-aux/sampling/store/route.js")
-  handler satisfies RouteHandlerConfig<"/api/str-aux/sampling/store">
-}
-
 // Validate ../../src/app/api/str-aux/shifts/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/str-aux/shifts/route.js")
   handler satisfies RouteHandlerConfig<"/api/str-aux/shifts">
+}
+
+// Validate ../../src/app/api/str-aux/sources/ingest/bins/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/str-aux/sources/ingest/bins/route.js")
+  handler satisfies RouteHandlerConfig<"/api/str-aux/sources/ingest/bins">
+}
+
+// Validate ../../src/app/api/str-aux/sources/ingest/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/str-aux/sources/ingest/route.js")
+  handler satisfies RouteHandlerConfig<"/api/str-aux/sources/ingest">
+}
+
+// Validate ../../src/app/api/str-aux/sources/ingest/sampling/points/5s/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/str-aux/sources/ingest/sampling/points/5s/route.js")
+  handler satisfies RouteHandlerConfig<"/api/str-aux/sources/ingest/sampling/points/5s">
+}
+
+// Validate ../../src/app/api/str-aux/sources/ingest/sampling/points/cycle/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/str-aux/sources/ingest/sampling/points/cycle/route.js")
+  handler satisfies RouteHandlerConfig<"/api/str-aux/sources/ingest/sampling/points/cycle">
+}
+
+// Validate ../../src/app/api/str-aux/sources/ingest/sampling/points/cycle/window/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/str-aux/sources/ingest/sampling/points/cycle/window/route.js")
+  handler satisfies RouteHandlerConfig<"/api/str-aux/sources/ingest/sampling/points/cycle/window">
+}
+
+// Validate ../../src/app/api/str-aux/sources/ingest/sampling/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/str-aux/sources/ingest/sampling/route.js")
+  handler satisfies RouteHandlerConfig<"/api/str-aux/sources/ingest/sampling">
+}
+
+// Validate ../../src/app/api/str-aux/sources/symbols/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/str-aux/sources/symbols/route.js")
+  handler satisfies RouteHandlerConfig<"/api/str-aux/sources/symbols">
 }
 
 // Validate ../../src/app/api/str-aux/stats/route.ts
@@ -443,16 +443,16 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/str-aux/stats">
 }
 
-// Validate ../../src/app/api/str-aux/symbols/route.ts
-{
-  const handler = {} as typeof import("../../src/app/api/str-aux/symbols/route.js")
-  handler satisfies RouteHandlerConfig<"/api/str-aux/symbols">
-}
-
 // Validate ../../src/app/api/str-aux/vectors/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/str-aux/vectors/route.js")
   handler satisfies RouteHandlerConfig<"/api/str-aux/vectors">
+}
+
+// Validate ../../src/app/api/system/refresh/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/system/refresh/route.js")
+  handler satisfies RouteHandlerConfig<"/api/system/refresh">
 }
 
 // Validate ../../src/app/api/vitals/health/route.ts

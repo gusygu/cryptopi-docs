@@ -580,3 +580,11 @@ SELECT
   cu.enabled
 FROM settings.coin_universe cu;
 
+-- append
+
+-- settings: session flag projection
+create or replace view settings.v_session_open as
+select f.is_open, f.opened_at, f.updated_at
+from ops.session_flags f
+where f.schema_name = 'settings';
+

@@ -9,6 +9,12 @@ const NO_STORE = { "Cache-Control": "no-store" };
 export async function GET(req: NextRequest) {
   const debug = req.nextUrl.searchParams.get("debug") === "1";
   const settings = await getAll();
+  const scope = req.nextUrl.searchParams.get("scope");
+
+  if (scope === "poller") {
+    return NextResponse.json({ poll: settings.poll }, { headers: NO_STORE });
+  }
+
   const shared = {
     settings,
     coinUniverse: settings.coinUniverse,
@@ -41,7 +47,13 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: Request) {
   const body = await req.json();
-  const enable = Array.isArray(body.enable) ? body.enable : [];
+// inside PUT /api/settings
+const enable: string[] = Array.isArray(body.enable) ? body.enable : [];
+if (enable.length) {
+  await query(`select settings.sp_upsert_coin_universe($1::text[])`, [enable]);
+  await query(`select settings.sp_mirror_universe_to_market()`); // idempotent
+}
+
   const disable = Array.isArray(body.disable) ? body.disable : [];
 
   // 1️⃣ Ensure market has the new ones
@@ -60,6 +72,8 @@ export async function PUT(req: Request) {
                     set enabled = false
                   where symbol = any($1::text[])`, [disable]);
 
+
+                  
   // 3️⃣ Auto-sync remaining market symbols
   await query(`select settings.sync_coin_universe(true, 'USDT')`);
 

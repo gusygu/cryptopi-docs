@@ -89,6 +89,7 @@ const clampPaletteIndex = (idx: number, palette: readonly string[]): number => {
 
 function resolveBaseRingColor({
   frozen,
+  frozenStage,
   ringStrategy,
   directSymbol,
   inverseSymbol,

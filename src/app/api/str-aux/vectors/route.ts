@@ -35,9 +35,75 @@ import {
   type SamplingWindowKey,
   type SamplingPoint,
 } from "@/core/features/str-aux/sampling";
+import { loadPoints, type MarketPoint } from "../utils";
+import { query } from "@/core/db/pool_server";
 
 // ---- (Optional) Pairs Index resolver (uncomment & set real path if desired)
 // import { resolveSymbolSelection } from "@/lib/markets/symbol-selection"; // TODO: adjust path
+
+type VectorPayload = {
+  vInner: number | null;
+  vOuter: number | null;
+  spread: number | null;
+  vTendency: {
+    score: number | null;
+    direction: number | null;
+    strength: number | null;
+    slope: number | null;
+    r: number | null;
+  } | null;
+  vSwap?: {
+    score: number | null;
+    quartile: number | null;
+    q1: number | null;
+    q3: number | null;
+  };
+};
+
+type VectorRow = {
+  symbol: string;
+  window: SamplingWindowKey;
+  bins: number;
+  scale: number;
+  samples: number;
+  payload: VectorPayload;
+  created_ts: string;
+};
+
+type VectorError = { symbol: string; error: string };
+
+type VectorComputationConfig = {
+  bins: number;
+  scale: number;
+  tendencyWindow: number;
+  tendencyNorm: "mad" | "stdev";
+  swapAlpha: number;
+};
+
+async function persistVector(symbol: string, window: SamplingWindowKey, summary: VectorSummary, ts: number) {
+  try {
+    await query(
+      `INSERT INTO str_aux.window_vectors (symbol, window_label, window_start, vec, updated_at)
+         VALUES ($1,$2, to_timestamp($3 / 1000.0), $4::jsonb, NOW())
+         ON CONFLICT (symbol, window_label, window_start)
+         DO UPDATE SET vec = EXCLUDED.vec, updated_at = NOW()`,
+      [
+        symbol,
+        window,
+        ts,
+        JSON.stringify({
+          inner: summary.inner,
+          outer: summary.outer,
+          tendency: summary.tendency,
+          swap: summary.swap ?? null,
+          history: summary.history ?? null,
+        }),
+      ],
+    );
+  } catch (err) {
+    console.warn("[str-aux/vectors] persist failed", symbol, window, err);
+  }
+}
 
 // =============================================================================
 // Helpers (append-only)
@@ -69,19 +135,22 @@ function parseSeriesCSV(csv?: string | null): VectorPoint[] {
 }
 
 /** Neutral, renderable VectorSummary shape (no data, no crashes). */
-function neutralSummary(bins = 128): VectorSummary {
+function neutralSummary(bins = 128, scale = 100): VectorSummary {
   return {
-    scale: 100,
+    scale,
     bins,
     samples: 0,
-    inner: { scaled: 0, unitless: 0, weightSum: 0 },
-    outer: { scaled: 0, unitless: 0, weightSum: 0 },
+    inner: { scaled: 0, unitless: 0, weightSum: 0, perBin: [] },
+    outer: { scaled: 0 },
     tendency: {
+      window: 30,
+      normalizer: "mad",
       series: [],
       metrics: { score: 0, direction: 0, strength: 0, slope: 0, r: 0 },
     },
     swap: { score: 0, Q: 0, q1: 0, q3: 0 },
-  } as unknown as VectorSummary;
+    history: { inner: null, tendency: null },
+  } as VectorSummary;
 }
 
 // add at top
@@ -129,19 +198,24 @@ function toVectorPoints(points: SamplingPoint[]): VectorPoint[] {
     .filter(v => Number.isFinite(v.price));
 }
 
-/** Compute one symbol’s detail with your computeVectorSummary. */
-function computeDetail(points: VectorPoint[], cfg: {
-  bins: number; scale: number; tendencyWindow: number; tendencyNorm: "mad"|"stdev"; swapAlpha: number;
-}) {
-  if (!points.length) {
-    return {
-      vInner: 0, vOuter: 0, spread: 0,
-      vTendency: { score: 0, direction: 0, strength: 0, slope: 0, r: 0 },
-      vSwap: { score: 0, quartile: 0, q1: 0, q3: 0 },
-      summary: neutralSummary(cfg.bins),
-    };
+async function fallbackVectorPoints(symbol: string, window: SamplingWindowKey, bins: number): Promise<VectorPoint[]> {
+  try {
+    const marketPoints: MarketPoint[] = await loadPoints(symbol, window, bins);
+    return marketPoints
+      .map((pt) => ({
+        price: Number(pt.price),
+        ts: Number(pt.ts),
+        volume: Number.isFinite(pt.volume) ? pt.volume : undefined,
+      }))
+      .filter((pt) => Number.isFinite(pt.price) && pt.price > 0);
+  } catch {
+    return [];
   }
-  const summary = computeVectorSummary(points, {
+}
+
+function computeSummary(points: VectorPoint[], cfg: VectorComputationConfig): VectorSummary {
+  if (!points.length) return neutralSummary(cfg.bins, cfg.scale);
+  return computeVectorSummary(points, {
     bins: cfg.bins,
     scale: cfg.scale,
     history: { inner: [], tendency: [] },
@@ -149,27 +223,55 @@ function computeDetail(points: VectorPoint[], cfg: {
     tendencyNorm: cfg.tendencyNorm,
     swapAlpha: cfg.swapAlpha,
   });
+}
 
+function toPayload(summary: VectorSummary): VectorPayload {
   const vInner = numOrNull(summary.inner?.scaled);
   const vOuter = numOrNull(summary.outer?.scaled);
-  const spread = Number.isFinite(vOuter) && Number.isFinite(vInner) ? (vOuter as number) - (vInner as number) : 0;
+  const spread =
+    Number.isFinite(vOuter) && Number.isFinite(vInner)
+      ? (vOuter as number) - (vInner as number)
+      : null;
   const tm = summary.tendency?.metrics ?? {};
-  const vTendency = {
-    score: numOrNull(tm.score),
-    direction: numOrNull(tm.direction),
-    strength: numOrNull(tm.strength),
-    slope: numOrNull(tm.slope),
-    r: numOrNull(tm.r),
-  };
-  const sw = summary.swap ?? {};
-  const vSwap = {
-    score: numOrNull((sw as any).score),
-    quartile: numOrNull((sw as any).Q),
-    q1: numOrNull((sw as any).q1),
-    q3: numOrNull((sw as any).q3),
-  };
+  const swap = summary.swap ?? null;
 
-  return { vInner, vOuter, spread, vTendency, vSwap, summary };
+  return {
+    vInner,
+    vOuter,
+    spread,
+    vTendency: {
+      score: numOrNull(tm.score),
+      direction: numOrNull(tm.direction),
+      strength: numOrNull(tm.strength),
+      slope: numOrNull(tm.slope),
+      r: numOrNull(tm.r),
+    },
+    vSwap: swap
+      ? {
+          score: numOrNull((swap as any).score),
+          quartile: numOrNull((swap as any).Q),
+          q1: numOrNull((swap as any).q1),
+          q3: numOrNull((swap as any).q3),
+        }
+      : undefined,
+  };
+}
+
+function toVectorRow(
+  symbol: string,
+  summary: VectorSummary,
+  window: SamplingWindowKey,
+  cfg: VectorComputationConfig
+): VectorRow {
+  return {
+    symbol,
+    window,
+    bins: cfg.bins,
+    scale: summary.scale ?? cfg.scale,
+    samples: summary.samples ?? 0,
+    payload: toPayload(summary),
+    created_ts: new Date().toISOString(),
+  };
 }
 
 /** Drive the SamplingStore enough to populate a window, if requested. */
@@ -210,12 +312,13 @@ export async function GET(req: NextRequest) {
     const swapAlpha = qFloat(url, "swapAlpha", 1.2);
     const sampleCycles = qInt(url, "cycles", 0);
     const force = (url.searchParams.get("force") ?? "").toLowerCase() === "true";
+    const vectorCfg: VectorComputationConfig = { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha };
 
     // If requested, run a few sampling cycles to populate data
     const store = await driveSampling(symbols, { window: windowKey, cycles: sampleCycles, force });
 
-    const vectors: Record<string, ReturnType<typeof computeDetail>> = {};
-    const errors: Array<{ symbol: string; error: string }> = [];
+    const vectors: VectorRow[] = [];
+    const errors: VectorError[] = [];
 
     for (const sym of symbols) {
       try {
@@ -228,11 +331,17 @@ export async function GET(req: NextRequest) {
           const raw: SamplingPoint[] = store.getPoints(sym, windowKey);
           points = toVectorPoints(raw);
         }
+        if (!points.length) {
+          points = await fallbackVectorPoints(sym, windowKey, bins);
+        }
 
-        vectors[sym] = computeDetail(points, { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha });
+        const summary = computeSummary(points, vectorCfg);
+        const row = toVectorRow(sym, summary, windowKey, vectorCfg);
+        vectors.push(row);
+        await persistVector(sym, windowKey, summary, Date.now());
       } catch (e: any) {
         errors.push({ symbol: sym, error: String(e?.message ?? e) });
-        vectors[sym] = computeDetail([], { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha });
+        vectors.push(toVectorRow(sym, neutralSummary(vectorCfg.bins, vectorCfg.scale), windowKey, vectorCfg));
       }
     }
 
@@ -242,7 +351,28 @@ export async function GET(req: NextRequest) {
         const any = symbols[0];
         if (!any) return null;
         const snap = store.snapshot(any);
-        return summarizeSnapshotWindow(snap, windowKey);
+        const digest = summarizeSnapshotWindow(snap, windowKey);
+        return {
+          window: {
+            key: digest.window.key,
+            size: digest.window.size,
+            capacity: digest.window.capacity,
+            statusCounts: digest.window.statusCounts,
+          },
+          cycle: digest.cycle,
+          lastPoint: digest.lastPoint,
+          lastClosedMark: digest.lastClosedMark
+            ? {
+                id: digest.lastClosedMark.id,
+                startedAt: digest.lastClosedMark.startedAt,
+                closedAt: digest.lastClosedMark.closedAt,
+                pointsCount: digest.lastClosedMark.pointsCount,
+                price: digest.lastClosedMark.price,
+                spread: digest.lastClosedMark.spread,
+                volume: digest.lastClosedMark.volume,
+              }
+            : null,
+        };
       } catch { return null; }
     })();
 
@@ -298,18 +428,20 @@ export async function POST(req: NextRequest) {
     const tNorm: "mad"|"stdev" = b?.tendencyNorm === "stdev" ? "stdev" : "mad";
     const swapAlpha: number = Number.isFinite(b?.swapAlpha) ? Number(b.swapAlpha) : 1.2;
 
-    const vectors: Record<string, ReturnType<typeof computeDetail>> = {};
-    const errors: Array<{ symbol: string; error: string }> = [];
+    const vectors: VectorRow[] = [];
+    const errors: VectorError[] = [];
+    const vectorCfg: VectorComputationConfig = { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha };
 
     // Path A: explicit points_map
     if (b?.points_map && typeof b.points_map === "object") {
       for (const sym of symbols) {
         try {
           const points = Array.isArray(b.points_map[sym]) ? b.points_map[sym] : [];
-          vectors[sym] = computeDetail(points, { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha });
+          const summary = computeSummary(points, vectorCfg);
+          vectors.push(toVectorRow(sym, summary, windowKey, vectorCfg));
         } catch (e: any) {
           errors.push({ symbol: sym, error: String(e?.message ?? e) });
-          vectors[sym] = computeDetail([], { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha });
+          vectors.push(toVectorRow(sym, neutralSummary(vectorCfg.bins, vectorCfg.scale), windowKey, vectorCfg));
         }
       }
       return NextResponse.json(
@@ -326,11 +458,16 @@ export async function POST(req: NextRequest) {
     for (const sym of symbols) {
       try {
         const raw: SamplingPoint[] = store.getPoints(sym, windowKey);
-        const points: VectorPoint[] = toVectorPoints(raw);
-        vectors[sym] = computeDetail(points, { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha });
+        let points: VectorPoint[] = toVectorPoints(raw);
+        if (!points.length) {
+          points = await fallbackVectorPoints(sym, windowKey, bins);
+        }
+        const summary = computeSummary(points, vectorCfg);
+        vectors.push(toVectorRow(sym, summary, windowKey, vectorCfg));
+        await persistVector(sym, windowKey, summary, Date.now());
       } catch (e: any) {
         errors.push({ symbol: sym, error: String(e?.message ?? e) });
-        vectors[sym] = computeDetail([], { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha });
+        vectors.push(toVectorRow(sym, neutralSummary(vectorCfg.bins, vectorCfg.scale), windowKey, vectorCfg));
       }
     }
 

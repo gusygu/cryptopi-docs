@@ -40,6 +40,7 @@ export async function fetchOpeningGridFromView(
   const coins = Array.from(new Set(args.coins.map((c) => c.toUpperCase())));
   const n = coins.length;
   const windowLabel = (args.window ?? DEFAULT_WINDOW).toLowerCase();
+  const pivot = (args.quote ?? "USDT").toUpperCase();
 
   let openingTs = args.openingTs ?? null;
   if (!openingTs) {
@@ -47,53 +48,73 @@ export async function fetchOpeningGridFromView(
   }
 
   const grid = makeGrid(n);
-  const pairSymbols: string[] = [];
-  const pairIndex = new Map<string, { i: number; j: number }>();
-
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      if (i === j) continue;
-      const symbol = `${coins[i]}${coins[j]}`;
-      pairSymbols.push(symbol);
-      pairIndex.set(symbol, { i, j });
-    }
+  if (!n) {
+    return { ts: openingTs ?? 0, grid };
   }
 
-  if (!pairSymbols.length) {
+  const targetSymbols = new Set<string>();
+  for (const coin of coins) {
+    if (coin === pivot) continue;
+    targetSymbols.add(`${coin}${pivot}`);
+    targetSymbols.add(`${pivot}${coin}`);
+  }
+
+  if (!targetSymbols.size) {
     return { ts: openingTs ?? 0, grid };
   }
 
   const startDate = openingTs != null ? new Date(openingTs) : null;
+  const candidateWindows = Array.from(new Set([windowLabel, "1m"]));
 
   const { rows } = await db.query<{
     symbol: string;
+    base: string | null;
+    quote: string | null;
     close_price: string;
     close_time: string;
+    window_label: string;
   }>(
     `
-    SELECT symbol, close_price, close_time
-      FROM market.klines
-     WHERE symbol = ANY($1::text[])
-       AND window_label = $2
-       AND ($3::timestamptz IS NULL OR close_time >= $3::timestamptz)
-  ORDER BY symbol, close_time ASC
+    SELECT
+      k.symbol,
+      (public._split_symbol(k.symbol)).base AS base,
+      (public._split_symbol(k.symbol)).quote AS quote,
+      k.close_price,
+      k.close_time,
+      k.window_label
+    FROM market.klines k
+    WHERE k.symbol = ANY($1::text[])
+      AND k.window_label = ANY($2::text[])
+      AND ($3::timestamptz IS NULL OR k.close_time >= $3::timestamptz)
+    ORDER BY
+      k.symbol,
+      CASE WHEN k.window_label = $4 THEN 0 ELSE 1 END,
+      k.close_time ASC
     `,
-    [pairSymbols, windowLabel, startDate]
+    [Array.from(targetSymbols), candidateWindows, startDate, windowLabel]
   );
 
   const seen = new Set<string>();
   let effectiveTs = openingTs ?? 0;
+  const priceMap = new Map<string, number>();
+  priceMap.set(pivot, 1);
 
   for (const row of rows) {
     const symbol = String(row.symbol ?? "").toUpperCase();
     if (!symbol || seen.has(symbol)) continue;
-    const idx = pairIndex.get(symbol);
-    if (!idx) continue;
-
+    const base = String(row.base ?? "").toUpperCase();
+    const quote = String(row.quote ?? "").toUpperCase();
     const price = Number(row.close_price);
     if (!Number.isFinite(price)) continue;
 
-    grid[idx.i][idx.j] = price;
+    if (quote === pivot) {
+      priceMap.set(base, price);
+    } else if (base === pivot && Math.abs(price) > 1e-12) {
+      priceMap.set(quote, 1 / price);
+    } else {
+      continue;
+    }
+
     seen.add(symbol);
 
     const tsMs = Date.parse(row.close_time);
@@ -102,14 +123,23 @@ export async function fetchOpeningGridFromView(
     }
   }
 
-  // Derive missing entries from inverse if available.
   for (let i = 0; i < n; i++) {
+    const baseCoin = coins[i]!;
+    const basePrice = priceMap.get(baseCoin) ?? null;
     for (let j = 0; j < n; j++) {
       if (i === j) continue;
-      if (grid[i][j] != null) continue;
-      const inverse = grid[j][i];
-      if (inverse != null && inverse !== 0) {
-        grid[i][j] = 1 / inverse;
+      const quoteCoin = coins[j]!;
+      const quotePrice = priceMap.get(quoteCoin) ?? null;
+      if (
+        basePrice != null &&
+        quotePrice != null &&
+        Number.isFinite(basePrice) &&
+        Number.isFinite(quotePrice) &&
+        Math.abs(quotePrice) > 1e-12
+      ) {
+        grid[i][j] = basePrice / quotePrice;
+      } else {
+        grid[i][j] = null;
       }
     }
   }

@@ -1,7 +1,7 @@
 // src/core/converters/Converter.server.ts
 // Server-side wiring + domain builders used by the Dynamics workspace.
 
-import { buildMeaAux } from "@/core/features/mea-aux/grid";
+import { buildMeaAux } from "@/core/features/moo-aux/grid";
 import type {
   ConverterSources,
   DomainArbRow,

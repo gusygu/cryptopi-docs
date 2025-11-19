@@ -1,60 +1,103 @@
-
 param(
-  [string]$BaseUrl = "http://localhost:3000"
+  [string]$Base = "http://localhost:3000",
+  [string]$Symbol = ""  # optional: single symbol filter
 )
 
-function Get-Json($url) {
+function POST-Json {
+  param([string]$Url, [hashtable]$Body)
+  $json = ($Body | ConvertTo-Json -Depth 8)
   try {
-    $resp = Invoke-RestMethod -Uri $url -Method GET -TimeoutSec 60
-    return $resp
+    $r = Invoke-RestMethod -Method Post -Uri $Url -Body $json -ContentType "application/json" -TimeoutSec 20
+    return $r
   } catch {
-    Write-Warning "GET $url failed: $($_.Exception.Message)"
+    Write-Warning "POST $Url failed: $($_.Exception.Message)"
   }
 }
 
-function Post-Json($url, $body = $null) {
+function GET-Json {
+  param([string]$Url)
   try {
-    if ($null -ne $body) {
-      $resp = Invoke-RestMethod -Uri $url -Method POST -Body ($body | ConvertTo-Json -Depth 6) -ContentType "application/json" -TimeoutSec 60
-    } else {
-      $resp = Invoke-RestMethod -Uri $url -Method POST -TimeoutSec 60
-    }
-    return $resp
+    return Invoke-RestMethod -Method Get -Uri $Url -TimeoutSec 20
   } catch {
-    Write-Warning "POST $url failed: $($_.Exception.Message)"
+    Write-Warning "GET $Url failed: $($_.Exception.Message)"
   }
 }
 
-Write-Host "== 1) Settings: show universe ==" -ForegroundColor Cyan
-Get-Json "$BaseUrl/api/settings/universe" | ConvertTo-Json -Depth 6
-Write-Host ""
+# -------------------------------------------------------------------
+Write-Host "=== STR-AUX Ingest Sequence ==="
+Write-Host "Base URL: $Base"
 
-Write-Host "== 2) Market: sync symbols from settings ==" -ForegroundColor Cyan
-Post-Json "$BaseUrl/api/market/symbols/sync" | ConvertTo-Json -Depth 6
-Write-Host ""
+# 1) Symbols + timing
+$symbolsResp = GET-Json "$Base/api/str-aux/sources/symbols"
+if (-not $symbolsResp.ok) { throw "symbols route failed" }
 
-Write-Host "== 3) Market: list symbols ==" -ForegroundColor Cyan
-Get-Json "$BaseUrl/api/market/symbols" | ConvertTo-Json -Depth 6
-Write-Host ""
+$symbols = $symbolsResp.symbols
+if ($Symbol -ne "") { $symbols = $symbols | Where-Object { $_ -eq $Symbol.ToUpper() } }
 
-Write-Host "== 4) Market: fetch raw klines (BTCUSDT 1m x60) ==" -ForegroundColor Cyan
-Get-Json "$BaseUrl/api/market/klines?symbol=BTCUSDT&interval=1m&limit=60" | ConvertTo-Json -Depth 6
-Write-Host ""
+$pointSec = [int]$symbolsResp.timing.point_sec
+$cycleSec = [int]$symbolsResp.timing.cycle_sec
+Write-Host "Symbols: $($symbols -join ', ')"
+Write-Host "point=$pointSec s | cycle=$cycleSec s"
 
-Write-Host "== 5) Market: ingest klines (1m,5m,15m x60) ==" -ForegroundColor Cyan
-Get-Json "$BaseUrl/api/market/ingest/klines?wins=1m,5m,15m&limit=60" | ConvertTo-Json -Depth 6
-Write-Host ""
+$nowMs = [int]([double](Get-Date -UFormat %s) * 1000)
 
-Write-Host "== 6) Matrices: benchmark/delta (30m, USDT) ==" -ForegroundColor Cyan
-Get-Json "$BaseUrl/api/matrices?window=30m&quote=USDT" | ConvertTo-Json -Depth 6
-Write-Host ""
+# -------------------------------------------------------------------
+foreach ($s in $symbols) {
+  Write-Host "→ $s ingest sequence..."
 
-Write-Host "== 7) STR-AUX vectors (stateless compute) ==" -ForegroundColor Cyan
-Get-Json "$BaseUrl/api/str-aux/vectors?window=30m&bins=128&scale=100&cycles=2&force=true" | ConvertTo-Json -Depth 6
-Write-Host ""
+  # 2) bins
+  # numeric mid
+$mid = [double](100 + (Get-Random -Minimum 0 -Maximum 30))
 
-Write-Host "== 8) STR-AUX vectors with synthetic BTCUSDT series ==" -ForegroundColor Cyan
-Get-Json "$BaseUrl/api/str-aux/vectors?symbols=BTCUSDT&series_BTCUSDT=100,101,103,102,104" | ConvertTo-Json -Depth 6
-Write-Host ""
+# depth arrays as numbers
+$bids = @(
+  @([double]($mid - 0.1), [double]0.5),
+  @([double]($mid - 0.2), [double]1.2)
+)
+$asks = @(
+  @([double]($mid + 0.1), [double]0.4),
+  @([double]($mid + 0.2), [double]0.9)
+)
 
-Write-Host "Done." -ForegroundColor Green
+  $binsRes = POST-Json "$Base/api/str-aux/sources/ingest/bins" @{
+    symbol = $s; ts = $nowMs; bids = $bids; asks = $asks; meta = @{ src = "ps:bins" }
+  }
+  Write-Host "  [bins] ->" ($binsRes | ConvertTo-Json -Depth 4)
+
+  # 3) 5s sampling
+  $sampleRes = POST-Json "$Base/api/str-aux/sources/ingest/sampling/5s" @{
+    symbol = $s; ts = $nowMs;
+    density = 0.8;
+    stats = @{ mid = $mid; spread = 0.2; w_bid = $bids[0][0]; w_ask = $asks[0][0] };
+    model = @{ bids = $bids; asks = $asks }
+  }
+  Write-Host "  [5s] ->" ($sampleRes | ConvertTo-Json -Depth 4)
+
+  # 4) roll cycle 40s
+  $cycleRes = POST-Json "$Base/api/str-aux/sources/ingest/sampling/cycle" @{ symbol = $s; ts = $nowMs }
+  Write-Host "  [cycle] ->" ($cycleRes | ConvertTo-Json -Depth 4)
+
+  # 5) roll window 30m
+  $winRes = POST-Json "$Base/api/str-aux/sources/ingest/sampling/window" @{ symbol = $s; label = "30m" }
+  Write-Host "  [window] ->" ($winRes | ConvertTo-Json -Depth 4)
+}
+
+# 6) global tick (windows all)
+$tickRes = POST-Json "$Base/api/str-aux/sources/ingest" @{}
+Write-Host "[tick]" ($tickRes | ConvertTo-Json -Depth 4)
+
+# 7) health
+$healthRes = GET-Json "$Base/api/str-aux/sources/ingest"
+Write-Host "[health]" ($healthRes | ConvertTo-Json -Depth 4)
+
+# 8) (optional) verify stats / vectors / latest
+$statsRes = GET-Json "$Base/api/str-aux/stats"
+if ($statsRes) { Write-Host "[stats]" ($statsRes | ConvertTo-Json -Depth 4) }
+
+$vectorsRes = GET-Json "$Base/api/str-aux/vectors"
+if ($vectorsRes) { Write-Host "[vectors]" ($vectorsRes | ConvertTo-Json -Depth 4) }
+
+$latestRes = GET-Json "$Base/api/str-aux/latest"
+if ($latestRes) { Write-Host "[latest]" ($latestRes | ConvertTo-Json -Depth 4) }
+
+Write-Host "=== done ==="

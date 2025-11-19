@@ -6,6 +6,11 @@ export type AppSettings = {
   coinUniverse: string[];
   profile: { nickname: string; email: string; binanceKeyId: string };
   stats: { histogramLen: number; bmDecimals: number; idPctDecimals: number };
+  poll: {
+    cycle40: number;
+    cycle120: number;
+    refreshUrl: string;
+  };
   timing: {
     autoRefresh: boolean;           // <-- required flag
     autoRefreshMs: number;
@@ -26,6 +31,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   coinUniverse: [],
   profile: { nickname: "", email: "", binanceKeyId: "" },
   stats: { histogramLen: 64, bmDecimals: 4, idPctDecimals: 6 },
+  poll: {
+    cycle40: 40,
+    cycle120: 120,
+    refreshUrl: "/api/system/refresh",
+  },
   timing: {
     autoRefresh: true,
     autoRefreshMs: 40_000,
@@ -83,6 +93,35 @@ const toParams = (value: unknown): Record<string, number> => {
   return result;
 };
 
+const toPoll = (value: unknown) => {
+  const base = {
+    cycle40: DEFAULT_SETTINGS.poll.cycle40,
+    cycle120: DEFAULT_SETTINGS.poll.cycle120,
+    refreshUrl: DEFAULT_SETTINGS.poll.refreshUrl,
+  };
+  if (!value || typeof value !== "object") return base;
+  const obj = value as Record<string, unknown>;
+  const sanitizeCycle = (raw: unknown, fallback: number) => {
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return fallback;
+    const bounded = Math.floor(parsed);
+    return Math.max(5, Math.min(600, bounded));
+  };
+  const resolveUrl = (raw: unknown): string | null => {
+    if (typeof raw !== "string") return null;
+    const trimmed = raw.trim();
+    return trimmed.length ? trimmed : null;
+  };
+  return {
+    cycle40: sanitizeCycle(obj.cycle40, base.cycle40),
+    cycle120: sanitizeCycle(obj.cycle120, base.cycle120),
+    refreshUrl:
+      resolveUrl(obj.refreshUrl) ??
+      resolveUrl(base.refreshUrl) ??
+      DEFAULT_SETTINGS.poll.refreshUrl,
+  };
+};
+
 // ---------- public migration (existing) ----------
 export function migrateSettings(input: unknown): AppSettings {
   const s = (input && typeof input === "object") ? (input as Record<string, unknown>) : {};
@@ -106,6 +145,7 @@ export function migrateSettings(input: unknown): AppSettings {
       bmDecimals: clamp(toNumber(statsSource.bmDecimals, DEFAULT_SETTINGS.stats.bmDecimals), 0, 6),
       idPctDecimals: clamp(toNumber(statsSource.idPctDecimals, DEFAULT_SETTINGS.stats.idPctDecimals), 0, 8),
     },
+    poll: toPoll(s.poll),
     timing: {
       autoRefresh: Boolean(timingSource.autoRefresh ?? DEFAULT_SETTINGS.timing.autoRefresh),
       autoRefreshMs: Math.max(500, toNumber(timingSource.autoRefreshMs, DEFAULT_SETTINGS.timing.autoRefreshMs)),

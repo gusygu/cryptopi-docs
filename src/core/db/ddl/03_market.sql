@@ -349,3 +349,11 @@ SELECT m.symbol, m.base_asset, m.quote_asset, m.status,
        COALESCE(cu.enabled, FALSE) AS enabled_in_settings
 FROM market.symbols m
 LEFT JOIN settings.coin_universe cu ON cu.symbol = m.symbol;
+
+
+-- append
+
+create or replace view market.v_session_open as
+select f.is_open, f.opened_at, f.updated_at
+from ops.session_flags f
+where f.schema_name = 'market';

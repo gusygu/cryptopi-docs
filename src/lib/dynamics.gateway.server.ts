@@ -24,10 +24,10 @@ export async function getMatricesLatest(coins?: Coins, init?: RequestInit): Prom
   return (await r.json()) as MatricesPayload;
 }
 
-/* ───────────────── MEA grid ───────────────── */
-// TODO: import from "auxiliary/mea-aux/server" once you want to bypass HTTP
-export async function getMeaGrid(coins: Coins, init?: RequestInit): Promise<Grid | undefined> {
-  const url = new URL("/api/mea-aux", baseURL());
+/* ───────────────── MOO grid ───────────────── */
+// TODO: import from "auxiliary/moo-aux/server" once you want to bypass HTTP
+export async function getMooGrid(coins: Coins, init?: RequestInit): Promise<Grid | undefined> {
+  const url = new URL("/api/moo-aux", baseURL());
   if (coins?.length) url.searchParams.set("coins", coins.join(","));
   url.searchParams.set("t", String(Date.now()));
   const r = await fetch(url, { cache: "no-store", ...init });
@@ -61,3 +61,4 @@ export async function getPreviewSymbols(init?: RequestInit): Promise<string[]> {
   const j = (await r.json()) as PreviewResp;
   return (j?.symbols ?? []).map((s) => s.toUpperCase());
 }
+

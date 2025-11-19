@@ -11,7 +11,7 @@ const ROUTES = [
   "/market/providers","/market/providers/binance/account/test","/market/providers/binance/preview","/market/providers/binance/wallet",
   "/market/sources","/market/ticker","/market/wallet",
   "/matrices","/matrices/latest",
-  "/mea-aux",
+  "/moo-aux",
   "/pipeline/auto","/pipeline/run-once",
   "/settings","/settings/wallet",
   "/str-aux","/str-aux/bins","/str-aux/latest","/str-aux/matrix",

@@ -122,7 +122,7 @@ async function main() {
 
   // MEA
   try {
-    const r = await getJson("/api/mea-aux");
+    const r = await getJson("/api/moo-aux");
     if (r.ok && r.json) {
       const ts = extractMeaTs(r.json) ?? Date.now();
       const { pairs, cells } = meaCounts(r.json);
@@ -133,7 +133,7 @@ async function main() {
         payload: r.json,
         pairsCount: pairs,
         rowsCount: cells,
-        notes: "bridge: from /api/mea-aux"
+        notes: "bridge: from /api/moo-aux"
       });
       console.log(green(`✓ mea doc @ ${ts}  pairs=${pairs} cells=${cells}`));
     } else {
@@ -184,3 +184,4 @@ async function main() {
 }
 
 main().catch(e => { console.error(red("[bridge error]"), e?.message || e); process.exit(1); });
+

@@ -52,7 +52,7 @@ type MatResp = {
   }>;
 };
 
-type MeaResp = { ok?: boolean; grid?: number[][]; tier?: string; tierLabel?: string };
+type MooResp = { ok?: boolean; grid?: number[][]; tier?: string; tierLabel?: string };
 
 type SettingsResp = {
   ok?: boolean;
@@ -89,11 +89,11 @@ export async function GET(req: NextRequest) {
 
   try {
     // parallel internal fetches
-    const [matR, meaR, setR] = await Promise.all([
+    const [matR, mooR, setR] = await Promise.all([
       fetch(`${origin}/api/matrices/latest?coins=${encodeURIComponent(coins.join(","))}&t=${Date.now()}`, { cache: "no-store" })
         .then(r => r.json() as Promise<MatResp>),
-      fetch(`${origin}/api/mea-aux?coins=${encodeURIComponent(coins.join(","))}&t=${Date.now()}`, { cache: "no-store" })
-        .then(r => r.json() as Promise<MeaResp>).catch(() => ({ ok: false } as MeaResp)),
+      fetch(`${origin}/api/moo-aux?coins=${encodeURIComponent(coins.join(","))}&t=${Date.now()}`, { cache: "no-store" })
+        .then(r => r.json() as Promise<MooResp>).catch(() => ({ ok: false } as MooResp)),
       fetch(`${origin}/api/settings`, { cache: "no-store" })
         .then(r => r.json() as Promise<SettingsResp>).catch(() => ({ ok: false } as SettingsResp)),
     ]);
@@ -101,13 +101,13 @@ export async function GET(req: NextRequest) {
     const benchmark = matR?.matrices?.benchmark ?? [];
     const id_pct    = matR?.matrices?.id_pct    ?? [];
     const pct_drv   = matR?.matrices?.pct_drv   ?? [];
-    const meaGrid   = meaR?.grid                ?? [];
+    const mooGrid   = mooR?.grid                ?? [];
 
     const wallets = setR?.wallets ?? {};
 
     // MEA panel value for selected pair (if provided)
-    const meaValue = Ca && Cb ? safeCell(meaGrid, coins, Ca, Cb) : 0;
-    const tier = (meaR?.tierLabel ?? meaR?.tier) || meaTier(meaValue);
+    const mooValue = Ca && Cb ? safeCell(mooGrid, coins, Ca, Cb) : 0;
+    const tier = (mooR?.tierLabel ?? mooR?.tier) || meaTier(mooValue);
 
     // ---------- build arbitrage rows (max 5) ----------
     type EdgeMetrics = { benchmark: number; id_pct: number; vTendency?: number; swapTag: SwapTag };
@@ -150,10 +150,10 @@ export async function GET(req: NextRequest) {
         benchmark,
         id_pct,
         pct_drv,
-        mea: meaGrid, // ← expose MEA to the client
+        mea: mooGrid, // ← expose MEA to the client
       },
       panels: {
-        mea: { value: meaValue, tier },
+        mea: { value: mooValue, tier },
       },
       rows, // for ArbTable
     };

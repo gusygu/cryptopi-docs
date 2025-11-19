@@ -61,7 +61,7 @@ async function saveSuite() {
       const checks = [
         // matrices
         ["dyn_matrix_values", `SELECT COUNT(*)::int AS c FROM dyn_matrix_values WHERE ts_ms > (EXTRACT(EPOCH FROM now())*1000 - 3600_000)`],
-        // mea-aux
+        // moo-aux
         ["mea_orientations", `SELECT COUNT(*)::int AS c FROM mea_orientations`],
         // cin-aux
         ["cin_aux_cycle", `SELECT COUNT(*)::int AS c FROM cin_aux_cycle`],
@@ -98,7 +98,7 @@ async function retrieveSuite() {
     ["matrices/latest", `${BASE_URL}/api/matrices/latest`],
     ["matrices (server)", `${BASE_URL}/api/matrices/server`],
     ["cin-aux", `${BASE_URL}/api/cin-aux`],
-    ["mea-aux", `${BASE_URL}/api/mea-aux`],
+    ["moo-aux", `${BASE_URL}/api/moo-aux`],
     ["str-aux/latest", `${BASE_URL}/api/str-aux/latest`],
     ["str-aux/matrix", `${BASE_URL}/api/str-aux/matrix`],
     ["market/pairs", `${BASE_URL}/api/preview/universe/symbols`],
@@ -136,3 +136,4 @@ else if (mode === "all") {
   console.error("Unknown mode. Use: save | retrieve | pipeline | all");
   process.exit(2);
 }
+

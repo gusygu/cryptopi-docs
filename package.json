@@ -10,13 +10,14 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev:web":  "next dev -p 3000",
+    "dev:web": "next dev -p 3000",
     "dev:jobs": "tsx src/scripts/jobs/run-all.ts",
     "kill:3000": "pwsh -NoProfile -Command \"Get-NetTCPConnection -LocalPort 3000 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }\"",
-   "dev": "next dev -p 3000",
+    "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "eslint .",
+    "system:refresh": "node --import tsx src/scripts/system/refresh.mts",
     "db:clean": "tsx src/scripts/db/clean-db.mts --force",
     "db:ddl": "tsx src/scripts/db/run-ddls.mts",
     "run-ddl": "pnpm db:ddl",
@@ -24,12 +25,13 @@
     "db:auto-ingest": "tsx src/scripts/jobs/auto-ddl-ingest.mts",
     "smoke:settings:doctor": "node --import tsx --env-file=.env src/scripts/smokes/smoke-settings-doctor.mts",
     "job:mat:snapshot": "node --import tsx --env-file=.env src/scripts/jobs/matrices-snapshot.mts",
+    "job:str:runner": "tsx src/scripts/jobs/str-aux-runner.ts",
     "smoke:doctor:matrices": "node --import tsx --env-file=.env src/scripts/smokes/doctor-matrices-storage.mts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
-   "dependencies": {
+  "dependencies": {
     "@types/ws": "^8.18.1",
     "next": "15.5.2",
     "pg": "^8.16.3",
@@ -40,6 +42,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@playwright/test": "^1.47.0",
     "@types/node": "^20.12.12",
     "@types/react": "^18.3.5",

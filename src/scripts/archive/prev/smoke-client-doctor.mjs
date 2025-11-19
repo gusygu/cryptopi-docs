@@ -38,7 +38,7 @@ async function checkAnyPage(){
 }
 
 async function checkSomeAPIs(){
-  const apis = ["/api/vitals/health","/api/vitals/status","/api/matrices/latest","/api/preview/universe/symbols","/api/mea-aux","/api/cin-aux","/api/str-aux/latest","/api/str-aux/matrix"];
+  const apis = ["/api/vitals/health","/api/vitals/status","/api/matrices/latest","/api/preview/universe/symbols","/api/moo-aux","/api/cin-aux","/api/str-aux/latest","/api/str-aux/matrix"];
   let any=false;
   for (const a of apis) {
     const r = await getJSON(a);
@@ -58,3 +58,4 @@ async function checkSomeAPIs(){
     process.exit(0);
   }catch(e){ fail("Client Doctor", e); }
 })();
+

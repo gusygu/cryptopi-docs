@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import crypto from "crypto";
 import BinanceLinkCard from "@/components/settings/BinanceLinkCard";
 import { getAll as getAppSettings, setAll as setAppSettings } from "@/lib/settings/server";
-import { normalizeCoinUniverse } from "@/lib/settings/schema";
+import { DEFAULT_SETTINGS, normalizeCoinUniverse } from "@/lib/settings/schema";
 import { syncCoinUniverseFromBinance } from "@/core/features/markets/coin-universe";
 import {
   getUserSettings,
@@ -173,6 +173,11 @@ export async function saveTimingAction(form: FormData): Promise<void> {
   const strCycleM30 = Math.max(1, safeNum(form.get("strCycleM30"), app.timing.strCycles.m30));
   const strCycleH1 = Math.max(1, safeNum(form.get("strCycleH1"), app.timing.strCycles.h1));
   const strCycleH3 = Math.max(1, safeNum(form.get("strCycleH3"), app.timing.strCycles.h3));
+  const pollCycle40 = Math.max(5, safeNum(form.get("pollCycle40"), app.poll?.cycle40 ?? DEFAULT_SETTINGS.poll.cycle40));
+  const pollCycle120 = Math.max(5, safeNum(form.get("pollCycle120"), app.poll?.cycle120 ?? DEFAULT_SETTINGS.poll.cycle120));
+  const pollRefreshUrl =
+    String(form.get("pollRefreshUrl") ?? app.poll?.refreshUrl ?? DEFAULT_SETTINGS.poll.refreshUrl).trim() ||
+    DEFAULT_SETTINGS.poll.refreshUrl;
 
   const next = {
     ...app,
@@ -183,6 +188,12 @@ export async function saveTimingAction(form: FormData): Promise<void> {
       secondaryEnabled,
       secondaryCycles,
       strCycles: { m30: strCycleM30, h1: strCycleH1, h3: strCycleH3 },
+    },
+    poll: {
+      ...app.poll,
+      cycle40: pollCycle40,
+      cycle120: pollCycle120,
+      refreshUrl: pollRefreshUrl,
     },
   };
 
@@ -392,6 +403,40 @@ export default async function SettingsPage({
                       step={1}
                       defaultValue={app.timing.secondaryCycles}
                       className="rounded-md bg-[#0f141a]/70 border border-white/10 px-2 py-2 text-sm"
+                    />
+                  </label>
+                </div>
+                <div className="grid gap-2 rounded-md border border-dashed border-white/15 p-3">
+                  <div className="text-sm font-medium">System refresh poller</div>
+                  <label className="grid gap-1 text-xs">
+                    <span className="text-slate-400">Cycle 40 (seconds)</span>
+                    <input
+                      name="pollCycle40"
+                      type="number"
+                      min={5}
+                      max={600}
+                      defaultValue={app.poll?.cycle40 ?? DEFAULT_SETTINGS.poll.cycle40}
+                      className="rounded-md bg-[#0f141a]/70 border border-white/10 px-2 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs">
+                    <span className="text-slate-400">Cycle 120 (seconds)</span>
+                    <input
+                      name="pollCycle120"
+                      type="number"
+                      min={5}
+                      max={900}
+                      defaultValue={app.poll?.cycle120 ?? DEFAULT_SETTINGS.poll.cycle120}
+                      className="rounded-md bg-[#0f141a]/70 border border-white/10 px-2 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs">
+                    <span className="text-slate-400">Refresh endpoint</span>
+                    <input
+                      name="pollRefreshUrl"
+                      type="text"
+                      defaultValue={app.poll?.refreshUrl ?? DEFAULT_SETTINGS.poll.refreshUrl}
+                      className="rounded-md bg-[#0f141a]/70 border border-white/10 px-2 py-2 text-sm font-mono"
                     />
                   </label>
                 </div>

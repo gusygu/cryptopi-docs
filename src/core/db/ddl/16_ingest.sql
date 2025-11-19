@@ -22,6 +22,13 @@ begin
 end
 $do$;
 
+-- Drop dependent views referencing split helpers
+do $do$
+begin
+  begin execute 'drop view if exists matrices.v_pair_universe'; exception when undefined_table then null; end;
+end
+$do$;
+
 -- Drop the autonotify function
 do $do$
 begin
@@ -143,6 +150,23 @@ begin
   end if;
 end
 $do$;
+
+-- Pair universe view (depends on split helper)
+set search_path = matrices, public;
+
+create or replace view matrices.v_pair_universe as
+with norm as (
+  select
+    upper(coalesce(cu.base_asset, (public._split_symbol(cu.symbol)).base))  as base,
+    upper(coalesce(cu.quote_asset, (public._split_symbol(cu.symbol)).quote)) as quote
+  from settings.coin_universe cu
+  where coalesce(cu.enabled, true) = true
+)
+select distinct base, quote
+from norm
+where base is not null
+  and quote is not null
+  and base <> quote;
 
 -- Back to ingest search_path
 set search_path = ingest, public;

@@ -38,7 +38,7 @@ const API_ENDPOINTS = [
   { href: "/api/str-aux/stats", label: "STR-aux stats" },
   { href: "/api/str-aux/bins", label: "STR-aux bins" },
   { href: "/api/str-aux/samples", label: "STR-aux samples" },
-  { href: "/api/mea-aux", label: "MEA-aux" },
+  { href: "/api/moo-aux", label: "MOO-aux" },
   { href: "/api/settings", label: "Settings" },
   { href: "/api/vitals/health", label: "Vitals health" },
   { href: "/api/vitals/status", label: "Vitals status" },

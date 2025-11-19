@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Matrix, { type MatrixCell } from "@/components/features/matrices/Matrix";
-import MeaAuxCard from "@/components/features/mea-aux/MeaAuxCard";
+import MooAuxCard from "@/components/features/moo-aux/MooAuxCard";
 import { withAlpha, type FrozenStage } from "@/components/features/matrices/colors";
 import CinMatricesPanel from "@/components/features/cin-aux/CinMatricesPanel";
 
@@ -347,7 +347,7 @@ export default function MatricesPage() {
   }, [payload, fallbackCoins]);
 
   const coinsKey = coins.join("|");
-  const meaDefaultK = useMemo(() => (coins.length > 1 ? Math.max(1, coins.length - 1) : 7), [coins.length]);
+  const mooDefaultK = useMemo(() => (coins.length > 1 ? Math.max(1, coins.length - 1) : 7), [coins.length]);
 
   useEffect(() => {
     let active = true;
@@ -657,7 +657,7 @@ export default function MatricesPage() {
         </header>
 
         <section className="mt-10 w-full">
-          <MeaAuxCard coins={coins} defaultK={meaDefaultK} autoRefreshMs={60_000} />
+          <MooAuxCard coins={coins} defaultK={mooDefaultK} autoRefreshMs={60_000} />
         </section>
 
         <section className="mt-10 grid w-full gap-6 sm:grid-cols-2">
@@ -705,9 +705,6 @@ function EmptyState() {
     </div>
   );
 }
-
-
-
 
 
 

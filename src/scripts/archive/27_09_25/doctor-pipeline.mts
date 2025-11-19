@@ -4,7 +4,7 @@
 //   MATRICES: /api/matrices/latest  -> public.dyn_matrix_values
 //   STR     : /api/str-aux/latest   -> public.strategy_aux_snapshots -> strategy_aux.str_aux_session
 //   CIN     : /api/cin-aux          -> public.v_cin_aux
-//   MEA     : /api/mea-aux          -> public.mea_orientations
+//   MEA     : /api/moo-aux          -> public.mea_orientations
 // Also shows DOC_TS from public.cycle_documents (per domain & APP_SESSION_ID).
 
 // -------- tiny arg parser (zero-dep) ----------
@@ -287,7 +287,7 @@ function hintFor(domain: DomainRow['domain'], v: string): string[] | null {
       ];
     }
     if (v.includes('Endpoint down')) {
-      return ['MEA endpoint not reachable. Check /api/mea-aux and its dependencies.'];
+      return ['MEA endpoint not reachable. Check /api/moo-aux and its dependencies.'];
     }
   }
   return null;
@@ -304,7 +304,7 @@ async function main(){
     fetchJson('/api/vitals/status'),
     fetchJson('/api/matrices/latest'),
     fetchJson('/api/cin-aux'),
-    fetchJson('/api/mea-aux'),
+    fetchJson('/api/moo-aux'),
     fetchJson('/api/str-aux/latest'),
   ]);
   const appTs = vStatus.ok ? asEpochMs((vStatus.json as any)?.app?.ts ?? (vStatus.json as any)?.ts_ms ?? null) : null;
@@ -385,3 +385,4 @@ main().catch(e=>{
   console.error(red('[doctor error]'), e?.message || e);
   process.exitCode = 1;
 });
+

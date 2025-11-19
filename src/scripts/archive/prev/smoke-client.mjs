@@ -45,7 +45,7 @@ async function run() {
       ["matrices", `${BASE_URL}/api/matrices`],
       ["market/pairs", `${BASE_URL}/api/preview/universe/symbols`],
       ["cin-aux", `${BASE_URL}/api/cin-aux`],
-      ["mea-aux", `${BASE_URL}/api/mea-aux`],
+      ["moo-aux", `${BASE_URL}/api/moo-aux`],
       ["str-aux/latest", `${BASE_URL}/api/str-aux/latest`],
     ];
     for (const [name, url] of apis) {
@@ -66,3 +66,4 @@ async function run() {
 }
 
 run();
+

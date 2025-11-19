@@ -71,8 +71,8 @@ function pickTsFromCinAux(payload:any): number | null {
   return asEpochMs(payload.ts ?? payload.cycleTs ?? null);
 }
 
-/* ---------------- mea-aux (no explicit ts) ---------------- */
-function pickShapeFromMeaAux(payload:any): string {
+/* ---------------- moo-aux (no explicit ts) ---------------- */
+function pickShapeFromMooAux(payload:any): string {
   if (!payload || typeof payload !== 'object') return '—';
   const grid = (payload as any).grid;
   if (!grid || typeof grid !== 'object') return 'grid: —';
@@ -151,11 +151,11 @@ async function main(){
     console.log(`${mark(r.ok)} /api/cin-aux  status=${r.status}  hint=rows=${rows} stale=${fmtStale(ts)}`);
   }
 
-  // mea-aux
+  // moo-aux
   {
-    const r = await fetchJson('/api/mea-aux');
-    const shape = r.ok ? pickShapeFromMeaAux(r.json) : '—';
-    console.log(`${mark(r.ok)} /api/mea-aux  status=${r.status}  hint=${shape}`);
+    const r = await fetchJson('/api/moo-aux');
+    const shape = r.ok ? pickShapeFromMooAux(r.json) : '-';
+    console.log(`${mark(r.ok)} /api/moo-aux  status=${r.status}  hint=${shape}`);
   }
 
   // str-aux/latest
@@ -170,3 +170,4 @@ main().catch((e:any)=>{
   console.error(red('[smoke error]'), e?.message || e);
   process.exitCode = 1;
 });
+
