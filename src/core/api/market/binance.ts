@@ -1,4 +1,5 @@
 import { getAccountBalances } from '@/core/sources/binanceAccount';
+import { persistWalletSnapshot } from "@/core/features/wallet/persist";
 
 const BINANCE_EXCHANGEINFO = 'https://api.binance.com/api/v3/exchangeInfo';
 const BINANCE_TICKER_24HR = 'https://api.binance.com/api/v3/ticker/24hr';
@@ -33,7 +34,13 @@ export type WalletSnapshot = {
 
 export async function getBinanceWalletBalances(email?: string): Promise<WalletSnapshot> {
   try {
-    const wallets = await getAccountBalances(email ? { email } : undefined);
+    const owner = email?.toLowerCase() ?? null;
+    const wallets = await getAccountBalances(owner ? { email: owner } : undefined);
+    try {
+      await persistWalletSnapshot(wallets, { provider: "binance", owner });
+    } catch (err) {
+      console.warn("[wallet] persist skipped:", err);
+    }
     return { ok: true, provider: 'binance', wallets };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'wallet fetch failed';

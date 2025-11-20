@@ -9,6 +9,11 @@ import {
   computeIdhrBins,
   type IdhrBins,
 } from '../frame/idhr'; // sampler only (no MarketPoint import)
+import {
+  deriveIdhrRanges,
+  filterByIdhrRanges,
+  type ReturnRange,
+} from '../frame/idhrRanges';
 
 import {
   computeVectorSummary,
@@ -31,6 +36,11 @@ export type Stats = {
   // dispersion (price series)
   sigma: number;
   zAbs: number;
+  idhr?: {
+    ranges: ReturnRange[];
+    selectedPrimaries: number[];
+    selectedBins: number[];
+  };
 
   // FloMo — absolute General Floating Mode (price space)
   gfmAbs: number;
@@ -90,6 +100,7 @@ type Options = {
   vScale?: number; // default 100
   tendencyWin?: number; // default 30
   tendencyNorm?: 'mad' | 'stdev'; // default 'mad'
+  swapAlpha?: number; // optional softness for vSwap tanh
   innerHistScaled?: number[];
   tendencyHistScaled?: number[];
 
@@ -158,6 +169,9 @@ export function computeStats(
   const Wm        = Math.max(5, Math.floor(opts.metricsWin ?? 30));
   const topK      = Math.max(1, Math.floor(opts.idhr?.topK ?? 8));
 
+  const rangeInfo = deriveIdhrRanges(points as Array<{ price: number; ts?: number }>);
+  const filteredForVectors = filterByIdhrRanges(points, rangeInfo);
+
   // price dispersion
   const prices = points.map((p) => Number(p.price)).filter(Number.isFinite);
   const openingPx = Number(opening?.benchmark ?? NaN);
@@ -223,7 +237,7 @@ export function computeStats(
   const shiftedBfm = Math.abs(deltaBfmPct) >= epsBfmPct;
 
   // vectors
-  const vectorSummary = computeVectorSummary(points, {
+  const vectorSummary = computeVectorSummary(filteredForVectors, {
     bins: binsCount,
     scale: vScale,
     history: {
@@ -232,6 +246,7 @@ export function computeStats(
     },
     tendencyWindow: opts.tendencyWin,
     tendencyNorm: opts.tendencyNorm,
+    swapAlpha: opts.swapAlpha,
   });
   const vInnerAgg = vectorSummary.inner.scaled;
   const vOuterAgg = vectorSummary.outer.scaled;
@@ -261,6 +276,13 @@ export function computeStats(
     // dispersion
     sigma,
     zAbs: z,
+    idhr: rangeInfo.ranges.length
+      ? {
+          ranges: rangeInfo.ranges,
+          selectedPrimaries: rangeInfo.selectedPrimaries,
+          selectedBins: rangeInfo.selectedBins,
+        }
+      : undefined,
 
     // modes
     gfmAbs,

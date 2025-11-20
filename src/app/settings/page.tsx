@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
 import BinanceLinkCard from "@/components/settings/BinanceLinkCard";
+import CinSessionHelperCard from "@/components/settings/CinSessionHelperCard";
 import { getAll as getAppSettings, setAll as setAppSettings } from "@/lib/settings/server";
 import { DEFAULT_SETTINGS, normalizeCoinUniverse } from "@/lib/settings/schema";
 import { syncCoinUniverseFromBinance } from "@/core/features/markets/coin-universe";
@@ -32,12 +33,12 @@ function ensureLoginEmail(sessionVal: string | undefined | null): string {
   redirect("/auth?err=login+required");
 }
 
-function safeNum(v: any, def: number): number {
+function safeNum(v: unknown, def: number): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : def;
 }
 
-function safeBool(v: any, def: boolean): boolean {
+function safeBool(v: unknown, def: boolean): boolean {
   if (v === "on" || v === true || v === "true") return true;
   if (v === "off" || v === false || v === "false") return false;
   return def;
@@ -287,6 +288,17 @@ export default async function SettingsPage({
               Error: {decodeURIComponent(err)}
             </div>
           ) : null}
+
+          {/* CIN-AUX session helper */}
+          <section className="rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-md p-4 shadow-sm">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold">CIN-AUX Session Access</h2>
+              <p className="text-xs text-slate-400">
+                Mint or copy the session identifier (uuid/bigint) you need to operate the CIN widgets on <span className="font-mono text-white/80">/matrices</span>.
+              </p>
+            </div>
+            <CinSessionHelperCard />
+          </section>
 
           {/* UNIVERSE & ENGINE (AppSettings: coins + stats) */}
           <section className="rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-md p-4 shadow-sm">
@@ -595,29 +607,6 @@ export default async function SettingsPage({
               {/* quick view of coin count to reinforce single-source universe */}
               <span className="text-[11px] text-slate-400">Universe: {app.coinUniverse.length} coins</span>
             </div>
-            // inside the Universe & Engine <form> ...
-              <div className="grid sm:grid-cols-3 gap-3">
-                <label className="grid gap-1">
-                  <span className="text-xs text-slate-400">epsilon (ε)</span>
-                  <input name="epsilon" type="number" step="any"
-                        defaultValue={app.params.values.epsilon ?? 0.02}
-                        className="rounded-md bg-[#0f141a]/70 border border-white/10 px-2 py-2 text-sm" />
-                </label>
-                <label className="grid gap-1">
-                  <span className="text-xs text-slate-400">eta (η)</span>
-                  <input name="eta" type="number" step="any"
-                        defaultValue={app.params.values.eta ?? 0.02}
-                        className="rounded-md bg-[#0f141a]/70 border border-white/10 px-2 py-2 text-sm" />
-                </label>
-                <label className="grid gap-1">
-                  <span className="text-xs text-slate-400">iota (ι)</span>
-                  <input name="iota" type="number" step="any"
-                        defaultValue={app.params.values.iota ?? 0.5}
-                        className="rounded-md bg-[#0f141a]/70 border border-white/10 px-2 py-2 text-sm" />
-                </label>
-              </div>
-              </form>
-
             <form action={saveParamsAction} className="grid gap-3">
               <div className="grid sm:grid-cols-3 gap-3">
                 <label className="grid gap-1">

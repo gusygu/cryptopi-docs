@@ -122,7 +122,12 @@ export async function upsertSample5s(sample: Sample) {
          $1::text, $2::timestamptz,
          $3::numeric, $4::numeric, $5::numeric, $6::numeric,
          $7::numeric, $8::numeric, $9::numeric, $10::numeric,
-         $11::int, $12::int, $13::jsonb
+         $11::int, $12::int, $13::jsonb,
+         $14::smallint, $15::int, $16::int, $17::int,
+         $18::numeric, $19::numeric, $20::numeric,
+         $21::numeric, $22::numeric,
+         $23::numeric,
+         $24::jsonb
        )`,
       [
         symbol,
@@ -138,6 +143,17 @@ export async function upsertSample5s(sample: Sample) {
         mode_general,
         mode_b,
         attrs ?? {},
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        [],
       ]
     );
   });

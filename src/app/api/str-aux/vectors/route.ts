@@ -153,9 +153,6 @@ function neutralSummary(bins = 128, scale = 100): VectorSummary {
   } as VectorSummary;
 }
 
-// add at top
-import { query } from "@/core/db/pool_server";
-
 /** Fetch enabled symbols from DB (settings.coin_universe) */
 async function getMarketSymbolsFromApi(origin: string): Promise<string[]> {
   try {

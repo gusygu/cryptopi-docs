@@ -1134,6 +1134,9 @@ th, td { white-space: nowrap; }
 .whitespace-nowrap {
   white-space: nowrap;
 }
+.break-all {
+  word-break: break-all;
+}
 .rounded {
   border-radius: 0.25rem;
 }
@@ -1716,6 +1719,9 @@ th, td { white-space: nowrap; }
 .bg-white\/5 {
   background-color: rgb(255 255 255 / 0.05);
 }
+.bg-white\/\[0\.03\] {
+  background-color: rgb(255 255 255 / 0.03);
+}
 .bg-white\/\[0\.04\] {
   background-color: rgb(255 255 255 / 0.04);
 }
@@ -2277,6 +2283,9 @@ th, td { white-space: nowrap; }
 .text-white\/80 {
   color: rgb(255 255 255 / 0.8);
 }
+.text-white\/90 {
+  color: rgb(255 255 255 / 0.9);
+}
 .text-zinc-100 {
   --tw-text-opacity: 1;
   color: rgb(244 244 245 / var(--tw-text-opacity, 1));
@@ -2292,6 +2301,10 @@ th, td { white-space: nowrap; }
 .text-zinc-400 {
   --tw-text-opacity: 1;
   color: rgb(161 161 170 / var(--tw-text-opacity, 1));
+}
+.text-amber-400 {
+  --tw-text-opacity: 1;
+  color: rgb(251 191 36 / var(--tw-text-opacity, 1));
 }
 .underline {
   text-decoration-line: underline;
@@ -2754,6 +2767,10 @@ html, body { background-color: var(--cp-bg-950); }
 }
 .hover\:border-emerald-300\/60:hover {
   border-color: rgb(110 231 183 / 0.6);
+}
+.hover\:border-emerald-400:hover {
+  --tw-border-opacity: 1;
+  border-color: rgb(52 211 153 / var(--tw-border-opacity, 1));
 }
 .hover\:border-emerald-400\/40:hover {
   border-color: rgb(52 211 153 / 0.4);

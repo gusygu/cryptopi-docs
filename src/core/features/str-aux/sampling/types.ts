@@ -3,6 +3,32 @@ export type SamplingWindowKey = "30m" | "1h" | "3h";
 
 export type SamplingHealthStatus = "ok" | "warn" | "error";
 
+export type OrderBookLevel = {
+  price: number;
+  qty: number;
+};
+
+export type OrderBookSnapshot = {
+  bids: OrderBookLevel[];
+  asks: OrderBookLevel[];
+};
+
+export type SamplingBucketMeta = {
+  bucketCount: number;
+  tickMsMin: number | null;
+  tickMsMax: number | null;
+  tickMsAvg: number | null;
+  spreadMin: number | null;
+  spreadMax: number | null;
+  spreadAvg: number | null;
+  midMin: number | null;
+  midMax: number | null;
+  topBidVol: number;
+  topAskVol: number;
+  liquidityImbalance: number | null;
+  qualityFlags: string[];
+};
+
 export type SamplingPoint = {
   symbol: string;
   ts: number;
@@ -12,6 +38,10 @@ export type SamplingPoint = {
   spread: number;
   bidVolume: number;
   askVolume: number;
+  bucketStart: number;
+  bucketEnd: number;
+  book: OrderBookSnapshot;
+  bucketMeta?: SamplingBucketMeta;
 };
 
 export type SamplingMark = {

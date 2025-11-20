@@ -155,6 +155,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/cin-aux/session/[sessionId]/tau">
 }
 
+// Validate ../../src/app/api/cin-aux/session/list/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/cin-aux/session/list/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/session/list">
+}
+
 // Validate ../../src/app/api/cin-aux/session/open/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/cin-aux/session/open/route.js")
@@ -363,6 +369,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   const handler = {} as typeof import("../../src/app/api/pipeline/run-once/route.js")
   handler satisfies RouteHandlerConfig<"/api/pipeline/run-once">
+}
+
+// Validate ../../src/app/api/preview/universe/symbols/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/preview/universe/symbols/route.js")
+  handler satisfies RouteHandlerConfig<"/api/preview/universe/symbols">
 }
 
 // Validate ../../src/app/api/settings/route.ts

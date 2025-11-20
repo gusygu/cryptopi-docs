@@ -1,14 +1,24 @@
 {
   "pages": {
-    "/api/matrices/latest/route": [
+    "/api/vitals/health/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/matrices/latest/route.js"
+      "static/chunks/app/api/vitals/health/route.js"
     ],
-    "/api/str-aux/stats/route": [
+    "/api/vitals/status/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/str-aux/stats/route.js"
+      "static/chunks/app/api/vitals/status/route.js"
+    ],
+    "/api/moo-aux/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/moo-aux/route.js"
+    ],
+    "/api/str-aux/vectors/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/str-aux/vectors/route.js"
     ],
     "/layout": [
       "static/chunks/webpack.js",
@@ -16,10 +26,10 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/matrices/page": [
+    "/str-aux/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/matrices/page.js"
+      "static/chunks/app/str-aux/page.js"
     ],
     "/icon/route": [
       "static/chunks/webpack.js",
@@ -31,30 +41,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/settings/route.js"
     ],
-    "/api/vitals/status/route": [
+    "/api/str-aux/stats/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/vitals/status/route.js"
+      "static/chunks/app/api/str-aux/stats/route.js"
     ],
-    "/api/vitals/health/route": [
+    "/api/preview/universe/symbols/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/vitals/health/route.js"
-    ],
-    "/api/moo-aux/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/moo-aux/route.js"
-    ],
-    "/str-aux/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/str-aux/page.js"
-    ],
-    "/api/str-aux/vectors/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/str-aux/vectors/route.js"
+      "static/chunks/app/api/preview/universe/symbols/route.js"
     ]
   }
 }

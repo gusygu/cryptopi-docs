@@ -1,0 +1,21 @@
+/*
+ * ATTENTION: An "eval-source-map" devtool has been used.
+ * This devtool is neither made for production nor for readable output files.
+ * It uses "eval()" calls to create a separate source file with attached SourceMaps in the browser devtools.
+ * If you are trying to read the output file, select a different devtool (https://webpack.js.org/configuration/devtool/)
+ * or disable the default devtool with "devtool: false".
+ * If you are looking for production-ready output files, see mode: "production" (https://webpack.js.org/configuration/mode/).
+ */
+self["webpackHotUpdate_N_E"]("app/str-aux/page",{
+
+/***/ "(app-pages-browser)/./node_modules/.pnpm/next@15.5.2_@playwright+tes_b7e6c280e9a1b4309347c0bf0ab476d5/node_modules/next/dist/build/webpack/loaders/next-flight-client-entry-loader.js?modules=%7B%22request%22%3A%22H%3A%5C%5CUsers%5C%5CGus%5C%5Csource%5C%5Crepo%5C%5Cdynamics%5C%5Cdynamics-b%5C%5Ccryptopi-dynamics%5C%5Csrc%5C%5Capp%5C%5Cstr-aux%5C%5CStrAuxComponent.tsx%22%2C%22ids%22%3A%5B%22default%22%5D%7D&server=false!":
+/*!*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** ./node_modules/.pnpm/next@15.5.2_@playwright+tes_b7e6c280e9a1b4309347c0bf0ab476d5/node_modules/next/dist/build/webpack/loaders/next-flight-client-entry-loader.js?modules=%7B%22request%22%3A%22H%3A%5C%5CUsers%5C%5CGus%5C%5Csource%5C%5Crepo%5C%5Cdynamics%5C%5Cdynamics-b%5C%5Ccryptopi-dynamics%5C%5Csrc%5C%5Capp%5C%5Cstr-aux%5C%5CStrAuxComponent.tsx%22%2C%22ids%22%3A%5B%22default%22%5D%7D&server=false! ***!
+  \*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/***/ ((__unused_webpack_module, __unused_webpack_exports, __webpack_require__) => {
+
+eval(__webpack_require__.ts("Promise.resolve(/*! import() eager */).then(__webpack_require__.bind(__webpack_require__, /*! ./src/app/str-aux/StrAuxComponent.tsx */ \"(app-pages-browser)/./src/app/str-aux/StrAuxComponent.tsx\"));\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKGFwcC1wYWdlcy1icm93c2VyKS8uL25vZGVfbW9kdWxlcy8ucG5wbS9uZXh0QDE1LjUuMl9AcGxheXdyaWdodCt0ZXNfYjdlNmMyODBlOWExYjQzMDkzNDdjMGJmMGFiNDc2ZDUvbm9kZV9tb2R1bGVzL25leHQvZGlzdC9idWlsZC93ZWJwYWNrL2xvYWRlcnMvbmV4dC1mbGlnaHQtY2xpZW50LWVudHJ5LWxvYWRlci5qcz9tb2R1bGVzPSU3QiUyMnJlcXVlc3QlMjIlM0ElMjJIJTNBJTVDJTVDVXNlcnMlNUMlNUNHdXMlNUMlNUNzb3VyY2UlNUMlNUNyZXBvJTVDJTVDZHluYW1pY3MlNUMlNUNkeW5hbWljcy1iJTVDJTVDY3J5cHRvcGktZHluYW1pY3MlNUMlNUNzcmMlNUMlNUNhcHAlNUMlNUNzdHItYXV4JTVDJTVDU3RyQXV4Q29tcG9uZW50LnRzeCUyMiUyQyUyMmlkcyUyMiUzQSU1QiUyMmRlZmF1bHQlMjIlNUQlN0Qmc2VydmVyPWZhbHNlISIsIm1hcHBpbmdzIjoiQUFBQSxvTUFBK0siLCJzb3VyY2VzIjpbIiJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQoLyogd2VicGFja01vZGU6IFwiZWFnZXJcIiwgd2VicGFja0V4cG9ydHM6IFtcImRlZmF1bHRcIl0gKi8gXCJIOlxcXFxVc2Vyc1xcXFxHdXNcXFxcc291cmNlXFxcXHJlcG9cXFxcZHluYW1pY3NcXFxcZHluYW1pY3MtYlxcXFxjcnlwdG9waS1keW5hbWljc1xcXFxzcmNcXFxcYXBwXFxcXHN0ci1hdXhcXFxcU3RyQXV4Q29tcG9uZW50LnRzeFwiKTtcbiJdLCJuYW1lcyI6W10sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VSb290IjoiIn0=\n//# sourceURL=webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@15.5.2_@playwright+tes_b7e6c280e9a1b4309347c0bf0ab476d5/node_modules/next/dist/build/webpack/loaders/next-flight-client-entry-loader.js?modules=%7B%22request%22%3A%22H%3A%5C%5CUsers%5C%5CGus%5C%5Csource%5C%5Crepo%5C%5Cdynamics%5C%5Cdynamics-b%5C%5Ccryptopi-dynamics%5C%5Csrc%5C%5Capp%5C%5Cstr-aux%5C%5CStrAuxComponent.tsx%22%2C%22ids%22%3A%5B%22default%22%5D%7D&server=false!\n"));
+
+/***/ })
+
+});

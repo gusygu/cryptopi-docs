@@ -26,10 +26,49 @@ export async function POST(req: Request) {
     );
   }
 
-  // scalar stats sample
+  // scalar stats sample (legacy hook)
+  const attrs = {
+    density: density ?? null,
+    stats: stats ?? {},
+  };
   await query(
-    `select str_aux.upsert_sample_5s($1, to_timestamp($2/1000.0), $3, $4::jsonb)`,
-    [S, t, density ?? null, JSON.stringify(stats ?? {})]
+    `select str_aux.upsert_sample_5s(
+       $1::text, to_timestamp($2/1000.0),
+       $3::numeric, $4::numeric, $5::numeric, $6::numeric,
+       $7::numeric, $8::numeric, $9::numeric, $10::numeric,
+       $11::int, $12::int, $13::jsonb,
+       $14::smallint, $15::int, $16::int, $17::int,
+       $18::numeric, $19::numeric, $20::numeric,
+       $21::numeric, $22::numeric,
+       $23::numeric,
+       $24::jsonb
+     )`,
+    [
+      S,
+      t,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      attrs,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      [],
+    ]
   );
 
   // roll 40s cycle

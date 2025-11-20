@@ -23,6 +23,8 @@ export interface ComposeWeights {
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 
 const tanh = (x: number) => {
+  if (!Number.isFinite(x)) return Math.sign(x) || 0;
+  if (typeof Math.tanh === "function") return Math.tanh(x);
   const e = Math.exp(2 * x);
   return (e - 1) / (e + 1);
 };
@@ -100,18 +102,26 @@ export function vInner(nucleus: Nucleus, opts: VInnerOpts = {}): number {
   const w = nucleus.weights && nucleus.weights.length === x.length ? nucleus.weights : undefined;
   if (!x.length) return 0;
 
-  const c = opts.centerOverride ?? nucleus.center ?? wMedian(x, w);
-  const sigma = opts.sigmaOverride ?? wMAD(x, w, c);
+  const centerRaw = opts.centerOverride ?? nucleus.center ?? wMedian(x, w);
+  const c = Number.isFinite(centerRaw) ? (centerRaw as number) : 0;
+  const sigmaRaw = opts.sigmaOverride ?? wMAD(x, w, c);
+  const sigma = Number.isFinite(sigmaRaw) ? (sigmaRaw as number) : 0;
   const denom = sigma > 0 ? sigma : 1e-9;
 
   // weighted mean of standardized residuals
   let num = 0, den = 0;
   for (let i = 0; i < x.length; i++) {
-    const wi = w ? Math.max(0, w[i] || 0) : 1;
-    num += wi * ((x[i] - c) / denom);
+    const sampleWeight = w ? Number(w[i]) : 1;
+    const wi = Number.isFinite(sampleWeight) ? Math.max(0, sampleWeight) : 0;
+    if (!wi) continue;
+    const residual = (x[i] - c) / denom;
+    if (!Number.isFinite(residual)) continue;
+    num += wi * residual;
     den += wi;
   }
-  const rbar = den > 0 ? num / den : 0;
+  if (!(den > 0)) return 0;
+  const rbar = num / den;
+  if (!Number.isFinite(rbar)) return 0;
   return clamp(S * tanh(g * rbar), -S, S);
 }
 
@@ -254,7 +264,15 @@ export function vSwapQuartiles(
   const alpha: number = opts.alpha ?? 1.2;
 
   const n = Math.min(innerHistScaled.length, tendencyHistScaled.length);
-  if (n < 4) return { Q: 0, score: 0, q1: 0, q3: 0 };
+  if (n < 2) {
+    const last = innerHistScaled[innerHistScaled.length - 1] ?? 0;
+    const first = innerHistScaled[0] ?? last;
+    const unitless = S ? (last - first) / (2 * S) : (last - first) / 2;
+    const Q = clamp(unitless, -1, 1);
+    const score = clamp(S * tanh(alpha * Q), -S, S);
+    const tail = tendencyHistScaled[tendencyHistScaled.length - 1] ?? 0;
+    return { Q, score, q1: tail, q3: tail };
+  }
 
   // unitless series in [-1..1]
   const I = innerHistScaled.slice(-n).map((v) => (S ? v / S : v));

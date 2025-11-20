@@ -104,6 +104,17 @@ create table if not exists samples_5s (
   mode_b        smallint,
   -- misc
   attrs         jsonb not null default '{}'::jsonb,
+  bucket_count  smallint,
+  tick_ms_min   int,
+  tick_ms_max   int,
+  tick_ms_avg   int,
+  spread_min    numeric,
+  spread_max    numeric,
+  spread_avg    numeric,
+  mid_min       numeric,
+  mid_max       numeric,
+  liquidity_imbalance numeric,
+  quality_flags jsonb not null default '[]'::jsonb,
   primary key (symbol, ts)
 );
 
@@ -124,19 +135,35 @@ create or replace function upsert_sample_5s(
   _symbol text, _ts timestamptz,
   _v_inner numeric, _v_outer numeric, _v_swap numeric, _v_tendency numeric,
   _disruption numeric, _amp numeric, _volt numeric, _inertia numeric,
-  _mode_general smallint, _mode_b smallint, _attrs jsonb default '{}'::jsonb
+  _mode_general smallint, _mode_b smallint, _attrs jsonb default '{}'::jsonb,
+  _bucket_count smallint default null,
+  _tick_ms_min int default null, _tick_ms_max int default null, _tick_ms_avg int default null,
+  _spread_min numeric default null, _spread_max numeric default null, _spread_avg numeric default null,
+  _mid_min numeric default null, _mid_max numeric default null,
+  _liquidity_imbalance numeric default null,
+  _quality_flags jsonb default '[]'::jsonb
 ) returns void language sql as $$
   insert into str_aux.samples_5s(
     symbol, ts,
     v_inner, v_outer, v_swap, v_tendency,
     disruption, amp, volt, inertia,
-    mode_general, mode_b, attrs
+    mode_general, mode_b, attrs,
+    bucket_count, tick_ms_min, tick_ms_max, tick_ms_avg,
+    spread_min, spread_max, spread_avg,
+    mid_min, mid_max,
+    liquidity_imbalance,
+    quality_flags
   )
   values (
     _symbol, _ts,
     _v_inner, _v_outer, _v_swap, _v_tendency,
     _disruption, _amp, _volt, _inertia,
-    _mode_general, _mode_b, coalesce(_attrs,'{}'::jsonb)
+    _mode_general, _mode_b, coalesce(_attrs,'{}'::jsonb),
+    _bucket_count, _tick_ms_min, _tick_ms_max, _tick_ms_avg,
+    _spread_min, _spread_max, _spread_avg,
+    _mid_min, _mid_max,
+    _liquidity_imbalance,
+    coalesce(_quality_flags,'[]'::jsonb)
   )
   on conflict (symbol, ts) do update
     set v_inner = excluded.v_inner,
@@ -149,7 +176,18 @@ create or replace function upsert_sample_5s(
         inertia = excluded.inertia,
         mode_general = excluded.mode_general,
         mode_b = excluded.mode_b,
-        attrs = excluded.attrs;
+        attrs = excluded.attrs,
+        bucket_count = excluded.bucket_count,
+        tick_ms_min = excluded.tick_ms_min,
+        tick_ms_max = excluded.tick_ms_max,
+        tick_ms_avg = excluded.tick_ms_avg,
+        spread_min = excluded.spread_min,
+        spread_max = excluded.spread_max,
+        spread_avg = excluded.spread_avg,
+        mid_min = excluded.mid_min,
+        mid_max = excluded.mid_max,
+        liquidity_imbalance = excluded.liquidity_imbalance,
+        quality_flags = excluded.quality_flags;
 $$;
 
 create or replace function upsert_sample_5s_model(

@@ -8,12 +8,15 @@ import {
   vOuter,
   vTendencyFromSeries,
   vSwapQuartiles,
+  vSwapFromNuclei,
   type Nucleus as TendNucleus,
   type ComposeWeights,
 } from './calc/tendency';
 
 const EPS = 1e-9;
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const clampScale = (value: number, scale: number) =>
+  Math.max(-scale, Math.min(scale, value));
 
 export type VectorPoint = {
   price: number;
@@ -180,6 +183,14 @@ export function computeVectorSummary(
     : [];
   const samples = safePoints.length;
 
+  const chronological = safePoints
+    .filter((p) => Number.isFinite(p.ts))
+    .sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
+  const orderedPoints = chronological.length ? chronological : safePoints;
+  const priceSeries = orderedPoints.map((p) => p.price);
+  const scaledPriceHistory = deriveScaledPriceHistory(priceSeries, scale);
+  const { rawReturns, scaledReturns } = deriveReturnSeries(priceSeries, scale);
+
   const nuclei = buildVectorNuclei(safePoints, bins);
   const composeWeights: ComposeWeights[] = nuclei.map((nu) => ({ gamma: nucleusWeight(nu) }));
   const weightSum = composeWeights.reduce((sum, w) => {
@@ -190,16 +201,33 @@ export function computeVectorSummary(
   const aggregateInner = aggregateInnerNow(nuclei, composeWeights, undefined, scale);
   const outerScaled = vOuter(nuclei, composeWeights, { scale });
 
-  const historyInner = options.history?.inner ? [...options.history.inner] : [];
-  const historyTendency = options.history?.tendency ? [...options.history.tendency] : [];
-  const tendencySeries = historyTendency.concat([outerScaled]);
+  const historyInner = Array.isArray(options.history?.inner)
+    ? options.history!.inner.filter((value) => Number.isFinite(value)).map((value) => Number(value))
+    : [];
+  const historyTendency = Array.isArray(options.history?.tendency)
+    ? options.history!.tendency.filter((value) => Number.isFinite(value)).map((value) => Number(value))
+    : [];
   const window = Math.max(3, Math.floor(options.tendencyWindow ?? 30));
   const normalizer = options.tendencyNorm ?? 'mad';
+
+  const derivedTendencySeries = rawReturns.length >= 2 ? rawReturns : null;
+  const tendencySeries = derivedTendencySeries ?? historyTendency.concat([outerScaled]);
   const tendencyMetrics = vTendencyFromSeries(tendencySeries, {
     window,
     scale,
     normalizer,
   });
+  const derivedInnerHistory =
+    rawReturns.length >= 2
+      ? scaledPriceHistory.slice(Math.max(0, scaledPriceHistory.length - rawReturns.length))
+      : null;
+  const derivedTendencyHistory = scaledReturns.length >= 2 ? scaledReturns : null;
+  const historyInnerWithCurrent = derivedInnerHistory?.length
+    ? derivedInnerHistory
+    : historyInner.concat([aggregateInner.scaled]);
+  const historyTendencyWithCurrent = derivedTendencyHistory?.length
+    ? derivedTendencyHistory
+    : historyTendency.concat([tendencyMetrics.score]);
 
   let swap:
     | {
@@ -210,13 +238,16 @@ export function computeVectorSummary(
       }
     | undefined;
 
-  if (historyInner.length && historyTendency.length) {
-    const innerHist = historyInner.concat([aggregateInner.scaled]);
-    const tendencyHist = historyTendency.concat([tendencyMetrics.score]);
-    swap = vSwapQuartiles(innerHist, tendencyHist, {
+  if (historyInnerWithCurrent.length >= 2 && historyTendencyWithCurrent.length >= 2) {
+    swap = vSwapQuartiles(historyInnerWithCurrent, historyTendencyWithCurrent, {
       scale,
       alpha: options.swapAlpha ?? 1.2,
     });
+  }
+  if (!swap) {
+    const fallbackScore = vSwapFromNuclei(nuclei, bins, { scale, alpha: options.swapAlpha ?? 1.2 });
+    const unitless = scale ? fallbackScore / scale : fallbackScore;
+    swap = { Q: unitless, score: fallbackScore, q1: 0, q3: 0 };
   }
 
   const innerValues = nuclei.map((nu) => vInner(nu, { scale }));
@@ -261,4 +292,34 @@ export function computeVectorSummary(
       tendency: historyTendency.length ? historyTendency : null,
     },
   };
+}
+
+function deriveScaledPriceHistory(prices: number[], scale: number): number[] {
+  if (!prices.length) return [];
+  const mean = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+  const variance =
+    prices.reduce((sum, price) => sum + (price - mean) * (price - mean), 0) /
+    Math.max(1, prices.length);
+  const sigma = Math.sqrt(Math.max(variance, EPS));
+  if (!(sigma > 0)) return prices.map(() => 0);
+  return prices.map((price) => clampScale(((price - mean) / sigma) * scale, scale));
+}
+
+function deriveReturnSeries(prices: number[], scale: number): {
+  rawReturns: number[];
+  scaledReturns: number[];
+} {
+  const rawReturns: number[] = [];
+  const scaledReturns: number[] = [];
+  for (let i = 1; i < prices.length; i++) {
+    const prev = prices[i - 1];
+    const cur = prices[i];
+    if (!(prev > 0 && cur > 0)) continue;
+    const logRet = Math.log(cur / prev);
+    if (!Number.isFinite(logRet)) continue;
+    const raw = logRet * 100;
+    rawReturns.push(raw);
+    scaledReturns.push(clampScale(raw, scale));
+  }
+  return { rawReturns, scaledReturns };
 }

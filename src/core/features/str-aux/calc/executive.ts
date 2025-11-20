@@ -21,7 +21,6 @@ import {
   type SamplingWindowDigest,
   type SamplingWindowKey,
 } from "@/core/features/str-aux/sampling";
-
 export type MarketPoint = { ts: number; price: number };
 export type OpeningExact = { benchmark: number | null };
 

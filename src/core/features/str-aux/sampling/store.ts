@@ -12,6 +12,8 @@ import type {
   SamplingSnapshot,
   SamplingWindowKey,
   SamplingWindowSummary,
+  OrderBookSnapshot,
+  OrderBookLevel,
 } from "./types";
 
 type SymbolState = {
@@ -114,6 +116,12 @@ export class SamplingStore {
     return this.expectedPointsPerCycle;
   }
 
+  private bucketStart(ts: number): number {
+    return (
+      Math.floor(ts / this.config.pointIntervalMs) * this.config.pointIntervalMs
+    );
+  }
+
   private normalizeSymbol(symbol: string): string {
     return String(symbol ?? "").trim().toUpperCase();
   }
@@ -145,6 +153,9 @@ export class SamplingStore {
       const bestBid = Number.isFinite(ob.bestBid) ? ob.bestBid : ob.mid;
       const bestAsk = Number.isFinite(ob.bestAsk) ? ob.bestAsk : ob.mid;
       const spread = Number.isFinite(bestBid) && Number.isFinite(bestAsk) ? Math.abs(bestAsk - bestBid) : 0;
+      const bucketStart = this.bucketStart(ts);
+      const bucketEnd = bucketStart + this.config.pointIntervalMs;
+      const book = mapDepthSnapshot(ob.depth);
       return {
         symbol,
         ts,
@@ -154,6 +165,9 @@ export class SamplingStore {
         spread,
         bidVolume: Number.isFinite(ob.bidVol) ? ob.bidVol : 0,
         askVolume: Number.isFinite(ob.askVol) ? ob.askVol : 0,
+        bucketStart,
+        bucketEnd,
+        book,
       };
     } catch (err) {
       if (err instanceof SamplingStoreError) throw err;
@@ -364,4 +378,23 @@ export function getSamplingStore(config?: SamplerConfig): SamplingStore {
     (globalThis as any).__STR_AUX_SAMPLING_STORE__ = new SamplingStore(config ?? DEFAULT_SAMPLER_CONFIG);
   }
   return (globalThis as any).__STR_AUX_SAMPLING_STORE__!;
+}
+
+function mapDepthSnapshot(depth: any): OrderBookSnapshot {
+  const mapLevels = (levels?: any[]): OrderBookLevel[] => {
+    if (!Array.isArray(levels)) return [];
+    return levels
+      .map((row) => {
+        const price = Number(row?.[0]);
+        const qty = Number(row?.[1]);
+        if (!Number.isFinite(price) || !Number.isFinite(qty) || qty <= 0) return null;
+        return { price, qty };
+      })
+      .filter((lvl): lvl is OrderBookLevel => Boolean(lvl));
+  };
+
+  return {
+    bids: mapLevels(depth?.bids),
+    asks: mapLevels(depth?.asks),
+  };
 }
