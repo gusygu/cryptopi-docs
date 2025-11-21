@@ -102,17 +102,14 @@ function romanPhase(phase: number) {
 
 export default function HomeBar({ className = "" }: { className?: string }) {
   const pathname = usePathname() || "/";
-  const initialPoller = useMemo(() => safeGetPollerState(), []);
-  const initialMuted = useMemo(() => safeGetMuted(), []);
-
   const { data: settings } = useSettings();
 
-  const [autoOn, setAutoOn] = useState(initialPoller?.enabled ?? true);
-  const [remaining, setRemaining] = useState(initialPoller?.remaining40 ?? initialPoller?.dur40 ?? 40);
-  const [duration, setDuration] = useState(initialPoller?.dur40 ?? 40);
-  const [phase, setPhase] = useState(initialPoller?.phase ?? 1);
-  const [cyclesCompleted, setCyclesCompleted] = useState(initialPoller?.cyclesCompleted ?? 0);
-  const [metMute, setMetMuteState] = useState(initialMuted);
+  const [autoOn, setAutoOn] = useState(true);
+  const [remaining, setRemaining] = useState(40);
+  const [duration, setDuration] = useState(40);
+  const [phase, setPhase] = useState(1);
+  const [cyclesCompleted, setCyclesCompleted] = useState(0);
+  const [metMute, setMetMuteState] = useState(true);
   const [pulse, setPulse] = useState<TickPulse | null>(null);
   const [apiSelection, setApiSelection] = useState("");
   const [vitals, setVitals] = useState<VitalsState>({
@@ -123,6 +120,16 @@ export default function HomeBar({ className = "" }: { className?: string }) {
     statusLevel: null,
     statusCounts: null,
   });
+
+  useEffect(() => {
+    const state = safeGetPollerState();
+    if (!state) return;
+    setAutoOn(state.enabled);
+    setDuration(state.dur40 ?? 40);
+    setRemaining(state.remaining40 ?? state.dur40 ?? 40);
+    setPhase(state.phase ?? 1);
+    setCyclesCompleted(state.cyclesCompleted ?? 0);
+  }, []);
 
   const durationRef = useRef(duration);
   useEffect(() => {

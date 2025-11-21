@@ -31,6 +31,17 @@ type MooAuxSources = {
   balances?: string;
 };
 
+type MooPerSymbolEntry = {
+  uuid?: string;
+  [key: string]: unknown;
+};
+
+type MooPerSymbolMood = Record<string, Record<string, MooPerSymbolEntry>>;
+
+type MooMoodPayload = {
+  perSymbol?: MooPerSymbolMood;
+};
+
 type MooAuxSuccess = {
   ok: true;
   ts_ms?: number;
@@ -39,6 +50,7 @@ type MooAuxSuccess = {
   grid?: MooAuxGrid;
   id_pct?: MooAuxGrid;
   sources?: MooAuxSources;
+  mood?: MooMoodPayload;
   availability?: {
     symbols?: string[];
     pairs?: Array<{ symbol: string; base: string; quote: string }>;
@@ -49,6 +61,15 @@ type MooAuxFailure = { ok: false; error?: string };
 
 type MooAuxResponse = MooAuxSuccess | MooAuxFailure;
 
+function coinsEqual(a: string[], b: string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 export default function MooAuxCard({
   coins = FALLBACK_COINS,
   defaultK = 7,
@@ -58,7 +79,7 @@ export default function MooAuxCard({
   const normalizedCoins = useMemo(() => sanitizeCoins(coins, FALLBACK_COINS), [coins]);
   const [coinUniverse, setCoinUniverse] = useState<string[]>(normalizedCoins);
   const [cells, setCells] = useState<MatrixCell[][]>(() =>
-    buildMatrixCells(normalizedCoins, {}, {}, {}, defaultK)
+    buildMatrixCells(normalizedCoins, {}, {}, {}, defaultK, null)
   );
   const [timestamp, setTimestamp] = useState<number | null>(null);
   const [kValue, setKValue] = useState<number | null>(null);
@@ -72,8 +93,11 @@ export default function MooAuxCard({
   }, []);
 
   useEffect(() => {
-    setCoinUniverse(normalizedCoins);
-    setCells(buildMatrixCells(normalizedCoins, {}, {}, {}, defaultK));
+    setCoinUniverse((prev) => {
+      if (coinsEqual(prev, normalizedCoins)) return prev;
+      setCells(buildMatrixCells(normalizedCoins, {}, {}, {}, defaultK, null));
+      return normalizedCoins;
+    });
   }, [normalizedCoins, defaultK]);
 
   const refresh = useCallback(async () => {
@@ -104,12 +128,14 @@ export default function MooAuxCard({
           ? Math.floor(payload.k)
           : null;
       const effectiveK = divisor ?? fallbackDivisor;
+      const perSymbolMood = normalizePerSymbolMood(payload.mood?.perSymbol);
       const nextCells = buildMatrixCells(
         payloadCoins,
         payload.grid ?? {},
         payload.id_pct ?? {},
         normalizedBalances,
-        effectiveK
+        effectiveK,
+        perSymbolMood
       );
 
       if (!aliveRef.current) return;
@@ -247,12 +273,30 @@ function normalizeBalances(input: Record<string, number | null | undefined>): Re
   return out;
 }
 
+function normalizePerSymbolMood(input?: MooPerSymbolMood | null): MooPerSymbolMood | null {
+  if (!input) return null;
+  const out: MooPerSymbolMood = {};
+  for (const [quoteRaw, baseMap] of Object.entries(input)) {
+    const quote = String(quoteRaw ?? "").toUpperCase();
+    if (!quote) continue;
+    if (!baseMap || typeof baseMap !== "object") continue;
+    for (const [baseRaw, entry] of Object.entries(baseMap)) {
+      const base = String(baseRaw ?? "").toUpperCase();
+      if (!base) continue;
+      if (!out[quote]) out[quote] = {};
+      out[quote]![base] = { uuid: entry?.uuid };
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 function buildMatrixCells(
   coins: string[],
   grid: MooAuxGrid,
   idPct: MooAuxGrid,
   balances: Record<string, number>,
-  divisor: number
+  divisor: number,
+  perSymbolMood: MooPerSymbolMood | null
 ): MatrixCell[][] {
   if (!coins.length) return [];
 
@@ -300,7 +344,11 @@ return coins.map((base, i) =>
       const mooDisplay = formatDecimal(mooValue, 6, { signed: true });
       const tierDisplay = formatDecimal(tierWeight, 3);
       const allocDisplay = formatDecimal(weight, 4);
-      const detail = `w ${tierDisplay}`;
+      const moodUuid = perSymbolMood?.[quote]?.[base]?.uuid ?? null;
+      const detailParts: string[] = [];
+      if (moodUuid) detailParts.push(moodUuid);
+      detailParts.push(`w ${tierDisplay}`);
+      const detail = detailParts.filter(Boolean).join(" · ");
       const tooltip = `${base}/${quote} | moo ${mooDisplay} | tier ${tierDisplay} | alloc ${allocDisplay}`;
 
       return {

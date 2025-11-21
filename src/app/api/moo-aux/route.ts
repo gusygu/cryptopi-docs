@@ -14,6 +14,7 @@ import { resolveCoinsFromSettings } from "@/lib/settings/server";
 import { computeSampledMetrics } from "@/core/features/str-aux/calc/panel";
 import type { StatsOptions } from "@/core/features/str-aux/calc/stats";
 import type { SamplingWindowKey } from "@/core/features/str-aux/sampling";
+import { buildMatricesLatestPayload } from "@/app/api/matrices/latest/route";
 
 // NEW: mood imports (added in lib/mood.ts per our plan)
 import {
@@ -561,6 +562,30 @@ async function readIdPctGrid(coins: string[], tsMs: number): Promise<IdPctReadRe
     }
     return { grid: ensureIdPctGrid(baseGrid, targets), source };
   };
+
+  try {
+    const matricesPayload = await buildMatricesLatestPayload({ coins: targets });
+    if (matricesPayload.ok) {
+      const values = matricesPayload.matrices.id_pct?.values ?? {};
+      let populated = false;
+      for (const base of targets) {
+        const row = values[base] ?? {};
+        for (const quote of targets) {
+          if (base === quote) continue;
+          const num = Number(row?.[quote]);
+          if (!Number.isFinite(num)) continue;
+          if (!baseGrid[base]) baseGrid[base] = {};
+          baseGrid[base][quote] = num;
+          populated = true;
+        }
+      }
+      if (populated) {
+        return { grid: ensureIdPctGrid(baseGrid, targets), source: "matrices.latest" };
+      }
+    }
+  } catch {
+    // fall back to DB sources
+  }
 
   if (Number.isFinite(tsMs)) {
     try {
