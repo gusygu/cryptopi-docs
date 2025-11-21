@@ -35,8 +35,13 @@ import {
   type SamplingWindowKey,
   type SamplingPoint,
 } from "@/core/features/str-aux/sampling";
+import { ensureSamplingRuntime } from "@/core/features/str-aux/sampling/runtime";
 import { loadPoints, type MarketPoint } from "../utils";
 import { query } from "@/core/db/pool_server";
+import {
+  ensureWindowPoints,
+  minSamplesTarget,
+} from "@/core/features/str-aux/vectors/ensureWindowPoints";
 
 // ---- (Optional) Pairs Index resolver (uncomment & set real path if desired)
 // import { resolveSymbolSelection } from "@/lib/markets/symbol-selection"; // TODO: adjust path
@@ -135,7 +140,7 @@ function parseSeriesCSV(csv?: string | null): VectorPoint[] {
 }
 
 /** Neutral, renderable VectorSummary shape (no data, no crashes). */
-function neutralSummary(bins = 128, scale = 100): VectorSummary {
+function neutralSummary(bins = 256, scale = 100): VectorSummary {
   return {
     scale,
     bins,
@@ -300,9 +305,10 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const symbols = await resolveSymbols(url);
+    ensureSamplingRuntime();
 
     const windowKey = pickWindowKey(url.searchParams.get("window") ?? "30m");
-    const bins = qInt(url, "bins", 128);
+    const bins = qInt(url, "bins", 256);
     const scale = qFloat(url, "scale", 100);
     const tWin = qInt(url, "tendencyWin", 30);
     const tNorm: "mad"|"stdev" = (url.searchParams.get("tendencyNorm") ?? "mad").toLowerCase() === "stdev" ? "stdev" : "mad";
@@ -311,8 +317,9 @@ export async function GET(req: NextRequest) {
     const force = (url.searchParams.get("force") ?? "").toLowerCase() === "true";
     const vectorCfg: VectorComputationConfig = { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha };
 
-    // If requested, run a few sampling cycles to populate data
-    const store = await driveSampling(symbols, { window: windowKey, cycles: sampleCycles, force });
+    // If requested (or by default), run sampling cycles to populate data
+    const defaultCycles = Number.isFinite(sampleCycles) ? sampleCycles : 0;
+    const store = await driveSampling(symbols, { window: windowKey, cycles: defaultCycles, force });
 
     const vectors: VectorRow[] = [];
     const errors: VectorError[] = [];
@@ -323,13 +330,10 @@ export async function GET(req: NextRequest) {
         const csv = url.searchParams.get(`series_${sym}`);
         let points: VectorPoint[] = parseSeriesCSV(csv);
 
-        // Otherwise, use SamplingStore points for the requested window
+        // Otherwise, use SamplingStore points for the requested window.
         if (!points.length) {
-          const raw: SamplingPoint[] = store.getPoints(sym, windowKey);
+          const raw: SamplingPoint[] = await ensureWindowPoints(store, sym, windowKey, bins);
           points = toVectorPoints(raw);
-        }
-        if (!points.length) {
-          points = await fallbackVectorPoints(sym, windowKey, bins);
         }
 
         const summary = computeSummary(points, vectorCfg);
@@ -403,6 +407,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const b = await req.json().catch(() => ({} as any));
+    ensureSamplingRuntime();
 
     // Resolve symbols: body → market/pairs
     let symbols: string[] = Array.isArray(b?.symbols) ? b.symbols : [];
@@ -419,7 +424,7 @@ export async function POST(req: NextRequest) {
     }
 
     const windowKey = pickWindowKey(b?.window ?? "30m");
-    const bins: number = Number.isFinite(b?.bins) ? Math.max(1, Math.floor(b.bins)) : 128;
+    const bins: number = Number.isFinite(b?.bins) ? Math.max(1, Math.floor(b.bins)) : 256;
     const scale: number = Number.isFinite(b?.scale) ? Number(b.scale) : 100;
     const tWin: number = Number.isFinite(b?.tendencyWindow) ? Math.max(3, Math.floor(b.tendencyWindow)) : 30;
     const tNorm: "mad"|"stdev" = b?.tendencyNorm === "stdev" ? "stdev" : "mad";
@@ -454,11 +459,8 @@ export async function POST(req: NextRequest) {
     const store = await driveSampling(symbols, { window: windowKey, cycles, force });
     for (const sym of symbols) {
       try {
-        const raw: SamplingPoint[] = store.getPoints(sym, windowKey);
-        let points: VectorPoint[] = toVectorPoints(raw);
-        if (!points.length) {
-          points = await fallbackVectorPoints(sym, windowKey, bins);
-        }
+        const raw: SamplingPoint[] = await ensureWindowPoints(store, sym, windowKey, bins);
+        const points: VectorPoint[] = toVectorPoints(raw);
         const summary = computeSummary(points, vectorCfg);
         vectors.push(toVectorRow(sym, summary, windowKey, vectorCfg));
         await persistVector(sym, windowKey, summary, Date.now());

@@ -1,6 +1,9 @@
 {
-  "/api/str-aux/vectors/route": "app/api/str-aux/vectors/route.js",
   "/api/vitals/health/route": "app/api/vitals/health/route.js",
   "/api/vitals/status/route": "app/api/vitals/status/route.js",
-  "/str-aux/page": "app/str-aux/page.js"
+  "/api/matrices/latest/route": "app/api/matrices/latest/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/str-aux/page": "app/str-aux/page.js",
+  "/matrices/page": "app/matrices/page.js",
+  "/api/moo-aux/route": "app/api/moo-aux/route.js"
 }

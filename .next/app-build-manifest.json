@@ -1,5 +1,15 @@
 {
   "pages": {
+    "/api/str-aux/vectors/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/str-aux/vectors/route.js"
+    ],
+    "/api/str-aux/stats/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/str-aux/stats/route.js"
+    ],
     "/api/vitals/health/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -9,16 +19,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/vitals/status/route.js"
-    ],
-    "/api/moo-aux/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/moo-aux/route.js"
-    ],
-    "/api/str-aux/vectors/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/str-aux/vectors/route.js"
     ],
     "/layout": [
       "static/chunks/webpack.js",
@@ -31,6 +31,11 @@
       "static/chunks/main-app.js",
       "static/chunks/app/str-aux/page.js"
     ],
+    "/api/preview/universe/symbols/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/preview/universe/symbols/route.js"
+    ],
     "/icon/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -41,15 +46,30 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/settings/route.js"
     ],
-    "/api/str-aux/stats/route": [
+    "/api/system/refresh/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/str-aux/stats/route.js"
+      "static/chunks/app/api/system/refresh/route.js"
     ],
-    "/api/preview/universe/symbols/route": [
+    "/api/moo-aux/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/preview/universe/symbols/route.js"
+      "static/chunks/app/api/moo-aux/route.js"
+    ],
+    "/matrices/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/matrices/page.js"
+    ],
+    "/api/matrices/latest/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/matrices/latest/route.js"
+    ],
+    "/_not-found/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/_not-found/page.js"
     ]
   }
 }

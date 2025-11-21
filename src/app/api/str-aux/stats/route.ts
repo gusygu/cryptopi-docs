@@ -88,7 +88,7 @@ export async function GET(req: Request) {
     const selection = await resolveSymbolSelection(url);
     const symbols = selection.symbols;
     const windowKey = parseWindow(url.searchParams.get('window'));
-    const binsN = parseBinsParam(url.searchParams.get('bins'), 128);
+    const binsN = parseBinsParam(url.searchParams.get('bins'), 256);
     const appSessionId = (url.searchParams.get('sessionId') ?? 'ui').slice(0, 64);
     const epsPct = Number(url.searchParams.get('eps') ?? '0.35');
     const kCycles = Math.max(1, Math.floor(Number(url.searchParams.get('k') ?? '5')));

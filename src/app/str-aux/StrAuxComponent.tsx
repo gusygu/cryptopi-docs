@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 type Props = {
   symbols?: string[];
@@ -36,37 +36,21 @@ type VectorRow = {
   created_ts: string;
 };
 
-type StatRow = {
-  symbol: string;
-  window: string;
-  payload?: {
-    gfm?: number;
-    gfm_pct?: number;
-    price?: number;
-    shift?: number;
-    day?: number;
-    drv?: number;
-    opening?: number;
-    min?: number;
-    max?: number;
-  };
-  error?: string | null;
-  created_ts: string;
-};
-
 export default function StrAuxClient({
   symbols = [],
   win = '30m',
-  bins = 128,
+  bins = 256,
   base = '/api/str-aux',
 }: Props) {
-  const symArr = useMemo(() => symbols, [symbols]);
-  const symbolsCsv = useMemo(() => symArr.join(','), [symArr]);
+  const symbolsCsv = useMemo(() => symbols.join(','), [symbols]);
   const symbolsQuery = symbolsCsv ? `&symbols=${encodeURIComponent(symbolsCsv)}` : '';
   const [vectors, setVectors] = useState<Record<string, VectorRow>>({});
-  const [stats, setStats] = useState<Record<string, StatRow>>({});
+  const [stats, setStats] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [storeReady, setStoreReady] = useState(false);
+  const [expandedBins, setExpandedBins] = useState<Record<string, boolean>>({});
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     const vecUrl = `${base}/vectors?window=${encodeURIComponent(win)}&bins=${bins}${symbolsQuery}`;
@@ -82,132 +66,310 @@ export default function StrAuxClient({
         const sJson = await sRes.json();
 
         const vData: Record<string, VectorRow> = {};
-        const sData: Record<string, StatRow> = {};
-
         normalizeVectorRows(vJson, win, bins).forEach((row) => {
           if (row?.symbol) vData[row.symbol] = row;
         });
-        normalizeStatRows(sJson, win).forEach((row) => {
-          if (row?.symbol) sData[row.symbol] = row;
-        });
+
+        const sOut = sJson?.out && typeof sJson.out === 'object' ? (sJson.out as Record<string, any>) : {};
 
         setVectors(vData);
-        setStats(sData);
+        setStats(sOut);
+        setStoreReady(true);
       })
       .catch((e: any) => setErrorMsg(e.message || 'Error loading data'))
       .finally(() => setLoading(false));
   }, [win, bins, base, symbolsQuery]);
 
-  const symbolsList = symArr.length ? symArr : Object.keys({ ...vectors, ...stats });
+  const symbolsList = symbols.length ? symbols : Object.keys({ ...vectors, ...stats });
+  const pageSize = 9;
+  const pages = Math.max(1, Math.ceil(symbolsList.length / pageSize));
+  const clampedPage = Math.min(page, pages - 1);
+  const visibleSymbols = symbolsList.slice(clampedPage * pageSize, clampedPage * pageSize + pageSize);
 
   return (
     <div className="p-4 text-gray-100">
-      <h2 className="text-xl font-semibold mb-2">Str-Aux</h2>
-      <div className="text-sm opacity-70 mb-4">
-        Window: {win} • Bins: {bins} • Symbols: {symbolsList.join(', ') || '—'}
+      <h2 className="text-xl font-semibold mb-2">Str-Aux Dashboard</h2>
+      <div className="text-sm opacity-80 mb-4 flex flex-wrap gap-6 items-center justify-between">
+        <div className="flex flex-wrap gap-6">
+          <div>Window: {win}</div>
+          <div>Bins: {bins}</div>
+          <div>Symbols: {symbolsList.length || '-'}</div>
+        </div>
+        {pages > 1 && (
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              disabled={clampedPage === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              className="px-2 py-1 rounded-lg border border-indigo-500/40 disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span>
+              Page {clampedPage + 1} / {pages}
+            </span>
+            <button
+              disabled={clampedPage >= pages - 1}
+              onClick={() => setPage((p) => Math.min(pages - 1, p + 1))}
+              className="px-2 py-1 rounded-lg border border-indigo-500/40 disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {loading && <div className="opacity-70">Loading…</div>}
-      {errorMsg && <div className="text-red-400">Error: {errorMsg}</div>}
+      {errorMsg && <div className="text-amber-400">{errorMsg}</div>}
 
-      <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(300px,1fr))]">
-        {symbolsList.map((sym) => {
-          const v = vectors[sym];
-          const s = stats[sym];
-          const payload = s?.payload || {};
-          const statError = s?.error ?? null;
-          const vec = v?.payload || {};
-
-          return (
-            <div
-              key={sym}
-              className="rounded-2xl p-4 border border-indigo-500/30 bg-[#0d0d15] shadow-sm flex flex-col justify-between"
-            >
-              <div className="flex justify-between items-center mb-2">
-                <div className="font-semibold text-base">{sym}</div>
-                <div className="text-xs opacity-60">
-                  {win} • {bins ? `${bins} pts` : ''}
-                </div>
-              </div>
-
-              <div className="space-y-1 text-sm">
-                {statError ? (
-                  <div className="text-xs text-amber-400">
-                    {describeStatsError(statError, win)}
+      {!loading && !errorMsg && (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {visibleSymbols.map((sym) => (
+            <div key={sym} className="rounded-2xl p-4 border border-indigo-500/30 bg-[#0d0d15] shadow-sm">
+              {renderHeaderSection(sym, stats[sym], vectors[sym], storeReady, win)}
+              {renderMetricsSection(stats[sym])}
+              <div className="mt-3 border-t border-indigo-900/30 pt-3">{renderVectorSection(vectors[sym])}</div>
+              {(() => {
+                const streams = resolveStreams(stats[sym]);
+                if (!streams.length) return null;
+                return (
+                  <div className="mt-3">
+                    <h4 className="text-xs uppercase tracking-wide text-indigo-200/80 mb-2">Streams</h4>
+                    <div className="max-h-36 overflow-y-auto border border-indigo-900/30 rounded-lg">
+                      <table className="w-full text-xs">
+                        <tbody>
+                          {streams.map((row) => (
+                            <tr key={row.key} className="text-indigo-200/90 border-b border-indigo-900/20 last:border-b-0">
+                              <td className="py-1 px-2 opacity-70">{row.label}</td>
+                              <td className="py-1 px-2 text-right">{formatMaybe(row.prev)}</td>
+                              <td className="py-1 px-2 text-right">{formatMaybe(row.cur)}</td>
+                              <td className="py-1 px-2 text-right">{formatMaybe(row.greatest)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                ) : (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="opacity-70">GFM</span>
-                      <span>
-                        {payload.gfm?.toFixed(3) ?? '-'} ({(payload.gfm_pct ?? 0).toFixed(2)}%)
-                      </span>
-                    </div>
+                );
+              })()}
 
-                    <div className="flex justify-between">
-                      <span className="opacity-70">price</span>
-                      <span>{payload.price?.toFixed(6) ?? '-'}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="opacity-70">24h</span>
-                      <span>{payload.day?.toFixed(2) ?? '-'}%</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="opacity-70">drv</span>
-                      <span>{payload.drv?.toFixed(3) ?? '-'}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="opacity-70">opening</span>
-                      <span>{payload.opening?.toFixed(6) ?? '-'}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="opacity-70">min</span>
-                      <span>{payload.min?.toFixed(6) ?? '-'}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="opacity-70">max</span>
-                      <span>{payload.max?.toFixed(6) ?? '-'}</span>
-                    </div>
-                  </>
-                )}
-
-                <hr className="border-indigo-900/30 my-2" />
-
-                <div className="flex justify-between">
-                  <span className="opacity-70">vInner</span>
-                  <span>{vec.vInner ?? '-'}</span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="opacity-70">vOuter</span>
-                  <span>{vec.vOuter ?? '—'}</span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="opacity-70">spread</span>
-                  <span>{vec.spread ?? '-'}</span>
-                </div>
-
-                <div className="flex justify-between text-xs opacity-60">
-                  <span>samples</span>
-                  <span>{v?.samples ?? '-'}</span>
-                </div>
-
-                {vec.vTendency && (
-                  <div className="text-xs mt-1 opacity-70">
-                    tendency: dir {vec.vTendency.direction}, slope {vec.vTendency.slope}
+              {(() => {
+                const hist = resolveHistogram(stats[sym]);
+                if (!hist || !hist.counts.length) return null;
+                const expanded = expandedBins[sym] ?? false;
+                return (
+                  <div className="mt-3">
+                    <button
+                      onClick={() => setExpandedBins((map) => ({ ...map, [sym]: !expanded }))}
+                      className="text-xs px-2 py-1 border border-indigo-500/40 rounded-lg text-indigo-100 hover:bg-indigo-500/10 mb-2"
+                    >
+                      {expanded ? 'Hide bins' : 'Show bins'}
+                    </button>
+                    {expanded && <HistogramView histogram={hist} />}
                   </div>
-                )}
-              </div>
+                );
+              })()}
             </div>
-          );
-        })}
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function renderHeaderSection(
+  symbol: string,
+  statsEntry: any,
+  vectorsEntry: VectorRow | undefined,
+  storeReady: boolean,
+  windowKey: string
+) {
+  if (!statsEntry && !vectorsEntry) {
+    return <div className="text-sm text-amber-400">No data available for {symbol}.</div>;
+  }
+
+  const error = statsEntry?.error ?? null;
+  const lastTs = statsEntry?.lastUpdateTs ?? statsEntry?.meta?.lastUpdateTs ?? null;
+  const lastUpdate = lastTs ? new Date(Number(lastTs)).toLocaleTimeString() : 'n/a';
+  const shiftInfo = statsEntry?.shifts ?? {};
+  const samples = vectorsEntry?.samples ?? '-';
+
+  return (
+    <div className="flex flex-wrap gap-6 mb-6 items-center justify-between">
+      <div>
+        <div className="text-lg font-semibold">{symbol}</div>
+        <div className="text-xs uppercase tracking-wide opacity-70">Window {windowKey}</div>
       </div>
+      <div className="flex gap-6 text-sm">
+        <div>
+          <div className="text-xs uppercase opacity-70">Last update</div>
+          <div>{lastUpdate}</div>
+        </div>
+        <div>
+          <div className="text-xs uppercase opacity-70">Shifts</div>
+          <div>{shiftInfo?.nShifts ?? 0}</div>
+        </div>
+        <div>
+          <div className="text-xs uppercase opacity-70">Samples</div>
+          <div>{samples}</div>
+        </div>
+        <div>
+          <div className="text-xs uppercase opacity-70">Sampler</div>
+          <div>{storeReady ? 'running' : 'warming'}</div>
+        </div>
+      </div>
+      {error && (
+        <div className="text-amber-400 text-sm w-full">{describeStatsError(error, windowKey)}</div>
+      )}
+    </div>
+  );
+}
+
+function renderMetricsSection(statsEntry: any) {
+  if (!statsEntry) {
+    return <div className="text-sm text-amber-400">Waiting for stats.</div>;
+  }
+
+  const cards = statsEntry.cards ?? {};
+  const stats = statsEntry.stats ?? {};
+  const gfm = stats?.gfmAbs ?? statsEntry.gfmDelta?.anchorPrice;
+  const gfmPct = statsEntry.gfmDelta?.absPct ?? stats?.deltaGfmPct;
+  const price = cards?.live?.benchmark ?? stats?.last;
+  const pctDrv = cards?.live?.pct_drv ?? statsEntry?.streams?.pct_drv?.cur;
+  const opening = cards?.opening?.benchmark ?? stats?.opening;
+  const ranges = statsEntry.sessionStats ?? statsEntry.extrema ?? {};
+  const bfm = stats?.bfm01 ?? statsEntry?.stats?.bfm01;
+  const refBfm = stats?.refBfm01;
+  const deltaBfm = stats?.deltaBfmPct ?? (stats?.deltaBfm01 != null ? stats.deltaBfm01 * 100 : null);
+
+  const metricDefs = [
+    { label: 'GFM', value: formatMaybe(gfm), hint: `${formatMaybe(gfmPct, 2)}%` },
+    { label: 'BFM', value: formatMaybe(bfm, 3), hint: `ref ${formatMaybe(refBfm, 3)} (${formatMaybe(deltaBfm, 2)}%)` },
+    { label: 'Benchmark', value: formatMaybe(price), hint: `${formatMaybe(cards?.live?.pct24h, 2)}% 24h` },
+    { label: 'Drv', value: formatMaybe(pctDrv, 3), hint: 'session drift' },
+    { label: 'Opening', value: formatMaybe(opening), hint: 'session' },
+    { label: 'Min', value: formatMaybe(ranges.priceMin ?? ranges.benchPctMin, 4), hint: 'session low' },
+    { label: 'Max', value: formatMaybe(ranges.priceMax ?? ranges.benchPctMax, 4), hint: 'session high' },
+  ];
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+      {metricDefs.map((def) => (
+        <MetricCard key={def.label} label={def.label} value={def.value} hint={def.hint} />
+      ))}
+    </div>
+  );
+}
+
+function MetricCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="bg-[#060612] rounded-xl p-3 border border-indigo-500/20">
+      <div className="text-xs uppercase tracking-wide opacity-70">{label}</div>
+      <div className="text-lg font-semibold text-indigo-100">{value}</div>
+      {hint && <div className="text-xs text-indigo-300/80 mt-1">{hint}</div>}
+    </div>
+  );
+}
+
+function renderVectorSection(vectorRow?: VectorRow) {
+  if (!vectorRow) return <div className="text-sm text-amber-400">No vector snapshot yet.</div>;
+  const vec = vectorRow.payload ?? {};
+  return (
+    <>
+      <h3 className="font-semibold mb-3">Vectors</h3>
+      <div className="grid gap-4 md:grid-cols-2 text-sm">
+        <div className="space-y-2">
+          <VectorMetric label="vInner" value={vec.vInner} />
+          <VectorMetric label="vOuter" value={vec.vOuter} />
+          <VectorMetric label="Spread" value={vec.spread} />
+        </div>
+        <div className="space-y-2">
+          <VectorMetric label="vSwap score" value={vec.vSwap?.score} />
+          <VectorMetric label="vSwap quartile" value={vec.vSwap?.quartile} />
+          <VectorMetric label="Samples" value={vectorRow.samples} />
+        </div>
+      </div>
+      {vec.vTendency && (
+        <div className="mt-4 text-xs text-indigo-200/80 grid gap-1 md:grid-cols-3">
+          <div>
+            <span className="opacity-70 mr-2">Tendency score:</span>
+            {formatMaybe(vec.vTendency.score)}
+          </div>
+          <div>
+            <span className="opacity-70 mr-2">Direction:</span>
+            {formatMaybe(vec.vTendency.direction)}
+          </div>
+          <div>
+            <span className="opacity-70 mr-2">Slope:</span>
+            {formatMaybe(vec.vTendency.slope)}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function VectorMetric({ label, value }: { label: string; value: number | string | null | undefined }) {
+  return (
+    <div className="flex justify-between">
+      <span className="opacity-70">{label}</span>
+      <span>{formatMaybe(value)}</span>
+    </div>
+  );
+}
+
+function resolveStreams(entry: any) {
+  if (!entry?.streams) return [];
+  const rows: Array<{ key: string; label: string; prev?: number | null; cur?: number | null; greatest?: number | null }> = [];
+  for (const [key, row] of Object.entries(entry.streams as Record<string, any>)) {
+    if (!row) continue;
+    if (key === 'pct24h') continue;
+    rows.push({
+      key,
+      label: key.replace(/_/g, ' '),
+      prev: toNumberOrNull(row?.prev),
+      cur: toNumberOrNull(row?.cur),
+      greatest: toNumberOrNull(row?.greatest),
+    });
+  }
+  return rows;
+}
+
+function resolveHistogram(entry: any) {
+  const hist =
+    entry?.stats?.histogram ??
+    entry?.hist ??
+    (entry?.stats?.histogram ?? null);
+  if (!hist || !Array.isArray(hist.counts)) return null;
+  const counts = hist.counts.map((n: any) => Number(n) || 0);
+  const edges = Array.isArray(hist.returnsPct)
+    ? hist.returnsPct.map((n: any) => Number(n))
+    : Array.isArray(hist.edges)
+    ? hist.edges.map((n: any) => Number(n))
+    : [];
+  return { counts, edges };
+}
+
+function HistogramView({ histogram }: { histogram: { counts: number[]; edges: number[] } }) {
+  const maxCount = histogram.counts.reduce((m, n) => (n > m ? n : m), 0) || 1;
+  const displayLength = Math.min(histogram.counts.length, 64);
+
+  return (
+    <div className="space-y-1 text-xs">
+      {histogram.counts.slice(0, displayLength).map((count, idx) => {
+        const pct = Math.max(4, Math.round((count / maxCount) * 100));
+        const edge = histogram.edges[idx];
+        const label =
+          typeof edge === 'number' && Number.isFinite(edge) ? `${edge.toFixed(2)}%` : `bin ${idx + 1}`;
+        return (
+          <div key={`${label}-${idx}`} className="flex items-center gap-2">
+            <div className="w-20 text-right text-indigo-200/80">{label}</div>
+            <div className="flex-1 bg-[#10102a] rounded-full overflow-hidden h-3">
+              <div className="bg-indigo-500/70 h-full" style={{ width: `${pct}%` }}></div>
+            </div>
+            <div className="w-12 text-right text-indigo-200/90">{count}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -216,6 +378,24 @@ const toNumberOrNull = (value: unknown): number | null => {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 };
+
+function formatMaybe(value: any, fractionDigits = 4): string {
+  if (value == null || Number.isNaN(value)) return '-';
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value);
+  return num.toFixed(fractionDigits);
+}
+
+function describeStatsError(error: string, windowKey: string) {
+  if (!error) return '';
+  if (error === 'insufficient_window') {
+    return `Waiting for a full ${windowKey} sampling window.`;
+  }
+  if (error === 'no_points') {
+    return 'No recent sampling points yet.';
+  }
+  return error;
+}
 
 function normalizeVectorRows(data: any, win: string, bins: number): VectorRow[] {
   if (!data) return [];
@@ -277,49 +457,4 @@ function coerceVectorPayload(entry: any): VectorRow['payload'] {
     payload.vTendency = null;
   }
   return payload;
-}
-
-function normalizeStatRows(data: any, win: string): StatRow[] {
-  if (!data) return [];
-  if (Array.isArray(data?.stats)) return data.stats;
-  const out = data?.out;
-  if (!out || typeof out !== 'object') return [];
-  const rows: StatRow[] = [];
-  for (const [symbol, entry] of Object.entries(out)) {
-    if (!entry || typeof entry !== 'object') continue;
-    const error = typeof (entry as any)?.error === 'string' ? String((entry as any).error) : null;
-    const payload =
-      error && !(entry as any).payload
-        ? undefined
-        : (entry as any).payload ?? {
-            gfm: toNumberOrNull((entry as any)?.fm?.gfm_price ?? (entry as any)?.fm?.gfm_calc_price),
-            gfm_pct: toNumberOrNull((entry as any)?.gfmDelta?.absPct),
-            price: toNumberOrNull((entry as any)?.cards?.live?.benchmark),
-            shift: toNumberOrNull((entry as any)?.shifts ?? (entry as any)?.shift_stamp),
-            day: toNumberOrNull((entry as any)?.cards?.live?.pct24h),
-            drv: toNumberOrNull((entry as any)?.streams?.pct_drv?.cur),
-            opening: toNumberOrNull((entry as any)?.cards?.opening?.benchmark),
-            min: toNumberOrNull((entry as any)?.sessionStats?.priceMin),
-            max: toNumberOrNull((entry as any)?.sessionStats?.priceMax),
-          };
-    rows.push({
-      symbol,
-      window: (entry as any)?.window ?? data.window ?? win,
-      payload,
-      error,
-      created_ts: new Date(Number((entry as any)?.lastUpdateTs ?? data.ts ?? Date.now())).toISOString(),
-    });
-  }
-  return rows;
-}
-
-function describeStatsError(error: string, windowKey: string) {
-  if (!error) return '';
-  if (error === 'insufficient_window') {
-    return `Waiting for a full ${windowKey} sampling window.`;
-  }
-  if (error === 'no_points') {
-    return 'No recent sampling points yet.';
-  }
-  return error;
 }

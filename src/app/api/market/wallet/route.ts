@@ -7,8 +7,10 @@ export const revalidate = 0;
 
 const PROVIDERS = new Set(['binance']);
 
+const WALLET_DISABLED = (process.env.WALLET_ENABLED ?? '').toLowerCase() === 'false';
+
 export async function GET(req: Request) {
-  if (process.env.WALLET_ENABLED !== 'true') {
+  if (WALLET_DISABLED) {
     return NextResponse.json({ ok: false, error: 'wallet feature disabled' }, { status: 403 });
   }
 

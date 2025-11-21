@@ -8,6 +8,7 @@ import {
   persistLiveMatricesSlice,
   type MatrixGridObject,
 } from "../db/db.ts";
+import { persistWalletSnapshot } from "../features/wallet/persist.ts";
 
 /** Load matrices bases/quote from env -> DB coin_universe -> fallback */
 async function loadMatricesConfig() {
@@ -180,6 +181,7 @@ export async function runMatricesCycle(
 
   const finiteBenchmarkCells = countFiniteCells(benchmarkValues);
   let persisted = false;
+  let walletPersisted = 0;
 
   if (S.persist) {
     const appSessionId =
@@ -196,6 +198,22 @@ export async function runMatricesCycle(
       idemPrefix: "pipeline",
     });
     persisted = true;
+
+    // Persist wallet snapshot when available (best-effort, no throw)
+    const entries = Object.entries(snapshot.wallet ?? {}).filter(
+      ([, v]) => Number.isFinite(Number(v))
+    );
+    if (entries.length) {
+      try {
+        const walletMap = Object.fromEntries(
+          entries.map(([k, v]) => [String(k).toUpperCase(), Number(v)])
+        );
+        const res = await persistWalletSnapshot(walletMap, { provider: "binance" });
+        walletPersisted = res.persisted ?? 0;
+      } catch (err) {
+        ctx.logger?.warn?.("[matrices] wallet persist skipped", err);
+      }
+    }
   }
 
   await appendAppLedger({
@@ -207,6 +225,7 @@ export async function runMatricesCycle(
       quote,
       cells: finiteBenchmarkCells,
       persisted,
+      wallet_rows: walletPersisted,
       ts_ms: tsMs,
     },
     ts_epoch_ms: Date.now(),
@@ -214,7 +233,7 @@ export async function runMatricesCycle(
 
   const action = persisted ? "persisted" : "computed";
   ctx.logger?.info?.(
-    `[matrices] ${action} ${finiteBenchmarkCells} benchmark cells @ ${tsMs}`
+    `[matrices] ${action} ${finiteBenchmarkCells} benchmark cells @ ${tsMs} (wallet rows ${walletPersisted})`
   );
 
   return {

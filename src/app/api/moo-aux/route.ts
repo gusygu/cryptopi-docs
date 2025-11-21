@@ -549,6 +549,54 @@ async function readIdPctGrid(coins: string[], tsMs: number): Promise<IdPctReadRe
 
   if (!targets.length) return { grid: baseGrid, source: "empty" };
 
+  const applyIdPctRows = (rows: Array<{ base: string; quote: string; value: number }>, source: string) => {
+    if (!rows?.length) return null;
+    for (const row of rows) {
+      const base = normalizeCoinSymbol(row.base);
+      const quote = normalizeCoinSymbol(row.quote);
+      if (!base || !quote || base === quote) continue;
+      if (!baseGrid[base]) baseGrid[base] = {};
+      const idp = Number(row.value);
+      baseGrid[base][quote] = Number.isFinite(idp) ? idp : 0;
+    }
+    return { grid: ensureIdPctGrid(baseGrid, targets), source };
+  };
+
+  if (Number.isFinite(tsMs)) {
+    try {
+      const { rows } = await db.query<{ base: string; quote: string; value: number }>(
+        `SELECT DISTINCT ON (base, quote) base, quote, value
+           FROM matrices.dyn_values
+          WHERE matrix_type = 'id_pct'
+            AND ts_ms <= $1
+            AND base = ANY($2::text[])
+            AND quote = ANY($2::text[])
+          ORDER BY base, quote, ts_ms DESC`,
+        [tsMs, targets],
+      );
+      const applied = applyIdPctRows(rows, "matrices.dyn_values");
+      if (applied) return applied;
+    } catch {
+      // fall back to other sources
+    }
+  }
+
+  try {
+    const { rows } = await db.query<{ base: string; quote: string; value: number }>(
+      `SELECT DISTINCT ON (base, quote) base, quote, value
+         FROM matrices.dyn_values
+        WHERE matrix_type = 'id_pct'
+          AND base = ANY($1::text[])
+          AND quote = ANY($1::text[])
+        ORDER BY base, quote, ts_ms DESC`,
+      [targets],
+    );
+    const applied = applyIdPctRows(rows, "matrices.dyn_values");
+    if (applied) return applied;
+  } catch {
+    // continue with legacy fallbacks
+  }
+
   if (Number.isFinite(tsMs)) {
     try {
       const { rows } = await db.query<{ base: string; quote: string; id_pct: number }>(
