@@ -1,8 +1,10 @@
 "use client";
 
+"use client";
+
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import AssetIdentity from "@/components/features/dynamics/v2/AssetIdentity";
-import ArbTable from "@/components/features/dynamics/v2/ArbTable";
+import ArbTable, { type ArbTableRow } from "@/components/features/dynamics/v2/ArbTable";
 import AuxiliaryCard from "@/components/features/dynamics/v2/AuxiliaryCard";
 import DynamicsMatrix from "@/components/features/dynamics/v2/DynamicsMatrix";
 import { formatNumber } from "@/components/features/dynamics/utils";
@@ -12,10 +14,35 @@ import { fromDynamicsSnapshot, useDynamicsSnapshot } from "@/core/converters/Con
 import type { DynamicsSnapshot } from "@/core/converters/provider.types";
 import type { MatricesLatestPayload } from "@/app/api/matrices/latest/route";
 
+// 👇 copia daqui pra baixo praticamente igual ao teu page.tsx,
+// só mudando o nome do componente pra DynamicsClient.
+
 const STORAGE_KEY = "dynamics:selectedPair";
+
+// ... (todas as helpers: Pair, Grid, readMatrixValue, deriveDefaultPair, etc.)
+
+// no final, em vez de `export default function DynamicsPage() { ... }`
+export default function DynamicsClient() {
+
+
 
 type Pair = { base: string; quote: string };
 type Grid = Array<Array<number | null>>;
+const ARB_EDGE_KEYS = ["cb_ci", "ci_ca", "ca_ci"] as const;
+const ARB_EDGE_ALIASES: Record<(typeof ARB_EDGE_KEYS)[number], string[]> = {
+  cb_ci: ["cbCi", "CB_CI", "cb-ci"],
+  ci_ca: ["ciCa", "CI_CA", "ci-ca"],
+  ca_ci: ["caCi", "CA_CI", "ca-ci"],
+};
+
+function readMatrixValue(grid: Grid | undefined, coins: string[], from: string, to: string): number | null {
+  if (!grid?.length || !coins.length) return null;
+  const baseIdx = coins.indexOf(ensureUpper(from));
+  const quoteIdx = coins.indexOf(ensureUpper(to));
+  if (baseIdx < 0 || quoteIdx < 0) return null;
+  const value = grid?.[baseIdx]?.[quoteIdx];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
 
 function deriveDefaultPair(coins: string[]): Pair {
   if (!coins.length) return { base: "BTC", quote: "USDT" };
@@ -143,35 +170,96 @@ function normalizePair(target: Partial<Pair>, coins: string[], fallback: Pair): 
   return { base, quote };
 }
 
-function mapArbRows(snapshot: DynamicsSnapshot | null, allowedCoins?: Set<string>) {
+function pickArbEdge(row: any, key: (typeof ARB_EDGE_KEYS)[number]) {
+  const cols = (row?.cols ?? {}) as Record<string, any>;
+  if (cols[key]) return cols[key];
+  for (const alias of ARB_EDGE_ALIASES[key]) {
+    if (cols[alias]) return cols[alias];
+  }
+  return undefined;
+}
+
+function mapArbRows(snapshot: DynamicsSnapshot | null, allowedCoins?: Set<string>): ArbTableRow[] {
   if (!snapshot) return [];
   const walletMap = snapshot.arb?.wallets ?? snapshot.wallets ?? {};
-  return (snapshot.arb?.rows ?? [])
-    .map((row) => {
+  const rows = snapshot.arb?.rows ?? [];
+  const matrixCoins = (snapshot.coins ?? []).map(ensureUpper);
+  const benchmarkGrid = snapshot.matrix?.benchmark;
+  const idPctGrid = snapshot.matrix?.id_pct;
+  const mooGrid = snapshot.matrix?.mea as Grid | undefined;
+  const refGrid = snapshot.matrix?.ref as Grid | undefined;
+  const baseSymbol = ensureUpper(snapshot.base);
+  const quoteSymbol = ensureUpper(snapshot.quote);
+
+  return rows
+    .map<ArbTableRow | null>((row) => {
       const candidate = ensureUpper((row as any)?.ci ?? (row as any)?.symbol ?? "");
-      const cb = row.cols?.cb_ci ?? row.cols?.ci_ca ?? row.cols?.ca_ci;
-      const swapTag = cb?.swapTag ?? (row as any)?.metrics?.swapTag;
+      if (!candidate) return null;
+      if (allowedCoins?.size && !allowedCoins.has(candidate)) return null;
+      const fallbackByKey: Record<
+        (typeof ARB_EDGE_KEYS)[number],
+        { benchmark: number | null; idPct: number | null; moo: number | null; ref: number | null }
+      > = {
+        cb_ci: {
+          benchmark: readMatrixValue(benchmarkGrid as Grid | undefined, matrixCoins, quoteSymbol, candidate),
+          idPct: readMatrixValue(idPctGrid as Grid | undefined, matrixCoins, quoteSymbol, candidate),
+          moo: readMatrixValue(mooGrid, matrixCoins, quoteSymbol, candidate),
+          ref: readMatrixValue(refGrid, matrixCoins, quoteSymbol, candidate),
+        },
+        ci_ca: {
+          benchmark: readMatrixValue(benchmarkGrid as Grid | undefined, matrixCoins, candidate, baseSymbol),
+          idPct: readMatrixValue(idPctGrid as Grid | undefined, matrixCoins, candidate, baseSymbol),
+          moo: readMatrixValue(mooGrid, matrixCoins, candidate, baseSymbol),
+          ref: readMatrixValue(refGrid, matrixCoins, candidate, baseSymbol),
+        },
+        ca_ci: {
+          benchmark: readMatrixValue(benchmarkGrid as Grid | undefined, matrixCoins, baseSymbol, candidate),
+          idPct: readMatrixValue(idPctGrid as Grid | undefined, matrixCoins, baseSymbol, candidate),
+          moo: readMatrixValue(mooGrid, matrixCoins, baseSymbol, candidate),
+          ref: readMatrixValue(refGrid, matrixCoins, baseSymbol, candidate),
+        },
+      };
+      const edges = ARB_EDGE_KEYS.reduce((acc, key) => {
+        const metrics = pickArbEdge(row, key) as any;
+        acc[key] = {
+          idPct: metrics?.id_pct ?? fallbackByKey[key].idPct ?? null,
+          benchmark: metrics?.benchmark ?? fallbackByKey[key].benchmark ?? null,
+          vTendency: metrics?.vTendency ?? null,
+          moo: metrics?.moo ?? fallbackByKey[key].moo ?? null,
+          ref: metrics?.ref ?? fallbackByKey[key].ref ?? null,
+          swapTag: metrics?.swapTag,
+        };
+        return acc;
+      }, {} as ArbTableRow["edges"]);
+      const cbEdge = edges.cb_ci;
+      const primaryTag = cbEdge?.swapTag ?? edges.ci_ca?.swapTag ?? edges.ca_ci?.swapTag;
       const inertia = (row as any)?.metrics?.inertia as
         | "low"
         | "neutral"
         | "high"
         | "frozen"
         | undefined;
+
       return {
         symbol: candidate,
-        spread: cb?.id_pct,
-        benchmark: cb?.benchmark,
-        velocity: cb?.vTendency,
-        direction: swapTag?.direction,
+        spread: cbEdge?.idPct ?? fallbackByKey.cb_ci.idPct ?? null,
+        benchmark: cbEdge?.benchmark ?? fallbackByKey.cb_ci.benchmark ?? null,
+        velocity: cbEdge?.vTendency ?? null,
+        direction: primaryTag?.direction,
         inertia,
         wallet: walletMap?.[candidate] ?? walletMap?.[(row as any)?.ci],
-        updatedAt: swapTag?.changedAtIso,
+        updatedAt: primaryTag?.changedAtIso,
+        edges,
+        vSwap: (() => {
+          const raw = (row as any)?.metrics?.vSwap;
+          const num = typeof raw === "number" ? raw : Number(raw);
+          return Number.isFinite(num) ? num : null;
+        })(),
       };
     })
-    .filter((row) => !allowedCoins?.size || allowedCoins.has(row.symbol));
+    .filter((row): row is ArbTableRow => Boolean(row));
 }
 
-export default function DynamicsPage() {
   const universe = useCoinsUniverse();
 
   const fallbackCoins = useMemo(
@@ -371,7 +459,7 @@ export default function DynamicsPage() {
 
   const vm = useMemo(() => (snapshot ? fromDynamicsSnapshot(snapshot) : null), [snapshot]);
 
-  const arbRows = useMemo(() => mapArbRows(snapshot ?? null, allowedCoinSet), [snapshot, allowedCoinSet]);
+  const arbRows = useMemo<ArbTableRow[]>(() => mapArbRows(snapshot ?? null, allowedCoinSet), [snapshot, allowedCoinSet]);
 
   const requestCoins = useMemo(
     () => dedupeUpper([...coins, selected.base, selected.quote]),
@@ -704,7 +792,6 @@ export default function DynamicsPage() {
     </div>
   );
 }
-
 
 
 

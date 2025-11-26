@@ -47,6 +47,12 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 }
 
 
+// Validate ../../src/app/(auth)/auth/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/(auth)/auth/page.js")
+  handler satisfies AppPageConfig<"/auth">
+}
+
 // Validate ../../src/app/(auth)/login/page.tsx
 {
   const handler = {} as typeof import("../../src/app/(auth)/login/page.js")
@@ -57,6 +63,84 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   const handler = {} as typeof import("../../src/app/(auth)/page.js")
   handler satisfies AppPageConfig<"/">
+}
+
+// Validate ../../src/app/(auth)/register/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/(auth)/register/page.js")
+  handler satisfies AppPageConfig<"/register">
+}
+
+// Validate ../../src/app/(auth)/request-invite/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/(auth)/request-invite/page.js")
+  handler satisfies AppPageConfig<"/request-invite">
+}
+
+// Validate ../../src/app/admin/actions/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/actions/page.js")
+  handler satisfies AppPageConfig<"/admin/actions">
+}
+
+// Validate ../../src/app/admin/ingest/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/ingest/page.js")
+  handler satisfies AppPageConfig<"/admin/ingest">
+}
+
+// Validate ../../src/app/admin/invites/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/invites/page.js")
+  handler satisfies AppPageConfig<"/admin/invites">
+}
+
+// Validate ../../src/app/admin/jobs/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/jobs/page.js")
+  handler satisfies AppPageConfig<"/admin/jobs">
+}
+
+// Validate ../../src/app/admin/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/page.js")
+  handler satisfies AppPageConfig<"/admin">
+}
+
+// Validate ../../src/app/admin/system/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/system/page.js")
+  handler satisfies AppPageConfig<"/admin/system">
+}
+
+// Validate ../../src/app/admin/users/[userId]/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/users/[userId]/page.js")
+  handler satisfies AppPageConfig<"/admin/users/[userId]">
+}
+
+// Validate ../../src/app/admin/users/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/users/page.js")
+  handler satisfies AppPageConfig<"/admin/users">
+}
+
+// Validate ../../src/app/cin/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/cin/page.js")
+  handler satisfies AppPageConfig<"/cin">
+}
+
+// Validate ../../src/app/docs/[slug]/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/docs/[slug]/page.js")
+  handler satisfies AppPageConfig<"/docs/[slug]">
+}
+
+// Validate ../../src/app/docs/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/docs/page.js")
+  handler satisfies AppPageConfig<"/docs">
 }
 
 // Validate ../../src/app/dynamics/page.tsx
@@ -89,6 +173,24 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies AppPageConfig<"/settings">
 }
 
+// Validate ../../src/app/settings/profile/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/settings/profile/page.js")
+  handler satisfies AppPageConfig<"/settings/profile">
+}
+
+// Validate ../../src/app/settings/security/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/settings/security/page.js")
+  handler satisfies AppPageConfig<"/settings/security">
+}
+
+// Validate ../../src/app/settings/wallet/page.tsx
+{
+  const handler = {} as typeof import("../../src/app/settings/wallet/page.js")
+  handler satisfies AppPageConfig<"/settings/wallet">
+}
+
 // Validate ../../src/app/str-aux/page.tsx
 {
   const handler = {} as typeof import("../../src/app/str-aux/page.js")
@@ -113,6 +215,42 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/admin/market/sync-symbols">
 }
 
+// Validate ../../src/app/api/auth/invite-requests/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/auth/invite-requests/route.js")
+  handler satisfies RouteHandlerConfig<"/api/auth/invite-requests">
+}
+
+// Validate ../../src/app/api/auth/invites/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/auth/invites/route.js")
+  handler satisfies RouteHandlerConfig<"/api/auth/invites">
+}
+
+// Validate ../../src/app/api/auth/login/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/auth/login/route.js")
+  handler satisfies RouteHandlerConfig<"/api/auth/login">
+}
+
+// Validate ../../src/app/api/auth/logout/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/auth/logout/route.js")
+  handler satisfies RouteHandlerConfig<"/api/auth/logout">
+}
+
+// Validate ../../src/app/api/auth/register/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/auth/register/route.js")
+  handler satisfies RouteHandlerConfig<"/api/auth/register">
+}
+
+// Validate ../../src/app/api/auth/request-invite/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/auth/request-invite/route.js")
+  handler satisfies RouteHandlerConfig<"/api/auth/request-invite">
+}
+
 // Validate ../../src/app/api/auth/session/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/auth/session/route.js")
@@ -125,46 +263,100 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   handler satisfies RouteHandlerConfig<"/api/cin-aux/grid">
 }
 
+// Validate ../../src/app/api/cin-aux/mea/[sessionUuid]/results/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/cin-aux/mea/[sessionUuid]/results/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/mea/[sessionUuid]/results">
+}
+
+// Validate ../../src/app/api/cin-aux/mea/[sessionUuid]/scored/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/cin-aux/mea/[sessionUuid]/scored/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/mea/[sessionUuid]/scored">
+}
+
 // Validate ../../src/app/api/cin-aux/route.ts
 {
   const handler = {} as typeof import("../../src/app/api/cin-aux/route.js")
   handler satisfies RouteHandlerConfig<"/api/cin-aux">
 }
 
-// Validate ../../src/app/api/cin-aux/session/[sessionId]/balances/route.ts
+// Validate ../../src/app/api/cin-aux/runtime/sessions/[sessionId]/balances/route.ts
 {
-  const handler = {} as typeof import("../../src/app/api/cin-aux/session/[sessionId]/balances/route.js")
-  handler satisfies RouteHandlerConfig<"/api/cin-aux/session/[sessionId]/balances">
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/[sessionId]/balances/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions/[sessionId]/balances">
 }
 
-// Validate ../../src/app/api/cin-aux/session/[sessionId]/moves/route.ts
+// Validate ../../src/app/api/cin-aux/runtime/sessions/[sessionId]/close/route.ts
 {
-  const handler = {} as typeof import("../../src/app/api/cin-aux/session/[sessionId]/moves/route.js")
-  handler satisfies RouteHandlerConfig<"/api/cin-aux/session/[sessionId]/moves">
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/[sessionId]/close/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions/[sessionId]/close">
 }
 
-// Validate ../../src/app/api/cin-aux/session/[sessionId]/rollup/route.ts
+// Validate ../../src/app/api/cin-aux/runtime/sessions/[sessionId]/moves/route.ts
 {
-  const handler = {} as typeof import("../../src/app/api/cin-aux/session/[sessionId]/rollup/route.js")
-  handler satisfies RouteHandlerConfig<"/api/cin-aux/session/[sessionId]/rollup">
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/[sessionId]/moves/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions/[sessionId]/moves">
 }
 
-// Validate ../../src/app/api/cin-aux/session/[sessionId]/tau/route.ts
+// Validate ../../src/app/api/cin-aux/runtime/sessions/[sessionId]/prices/refresh/route.ts
 {
-  const handler = {} as typeof import("../../src/app/api/cin-aux/session/[sessionId]/tau/route.js")
-  handler satisfies RouteHandlerConfig<"/api/cin-aux/session/[sessionId]/tau">
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/[sessionId]/prices/refresh/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions/[sessionId]/prices/refresh">
 }
 
-// Validate ../../src/app/api/cin-aux/session/list/route.ts
+// Validate ../../src/app/api/cin-aux/runtime/sessions/[sessionId]/rollup/route.ts
 {
-  const handler = {} as typeof import("../../src/app/api/cin-aux/session/list/route.js")
-  handler satisfies RouteHandlerConfig<"/api/cin-aux/session/list">
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/[sessionId]/rollup/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions/[sessionId]/rollup">
 }
 
-// Validate ../../src/app/api/cin-aux/session/open/route.ts
+// Validate ../../src/app/api/cin-aux/runtime/sessions/[sessionId]/tau/route.ts
 {
-  const handler = {} as typeof import("../../src/app/api/cin-aux/session/open/route.js")
-  handler satisfies RouteHandlerConfig<"/api/cin-aux/session/open">
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/[sessionId]/tau/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions/[sessionId]/tau">
+}
+
+// Validate ../../src/app/api/cin-aux/runtime/sessions/[sessionId]/trades/sync/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/[sessionId]/trades/sync/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions/[sessionId]/trades/sync">
+}
+
+// Validate ../../src/app/api/cin-aux/runtime/sessions/[sessionId]/wallet/ingest/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/[sessionId]/wallet/ingest/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions/[sessionId]/wallet/ingest">
+}
+
+// Validate ../../src/app/api/cin-aux/runtime/sessions/[sessionId]/wallet/preview/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/[sessionId]/wallet/preview/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions/[sessionId]/wallet/preview">
+}
+
+// Validate ../../src/app/api/cin-aux/runtime/sessions/[sessionId]/wallet/refresh/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/[sessionId]/wallet/refresh/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions/[sessionId]/wallet/refresh">
+}
+
+// Validate ../../src/app/api/cin-aux/runtime/sessions/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/cin-aux/runtime/sessions/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/runtime/sessions">
+}
+
+// Validate ../../src/app/api/cin-aux/sessions/list/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/cin-aux/sessions/list/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/sessions/list">
+}
+
+// Validate ../../src/app/api/cin-aux/sessions/open/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/cin-aux/sessions/open/route.js")
+  handler satisfies RouteHandlerConfig<"/api/cin-aux/sessions/open">
 }
 
 // Validate ../../src/app/api/converter/vm/route.ts
@@ -183,6 +375,30 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   const handler = {} as typeof import("../../src/app/api/dynamics/route.js")
   handler satisfies RouteHandlerConfig<"/api/dynamics">
+}
+
+// Validate ../../src/app/api/invite/approve/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/invite/approve/route.js")
+  handler satisfies RouteHandlerConfig<"/api/invite/approve">
+}
+
+// Validate ../../src/app/api/invite/list/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/invite/list/route.js")
+  handler satisfies RouteHandlerConfig<"/api/invite/list">
+}
+
+// Validate ../../src/app/api/invite/reject/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/invite/reject/route.js")
+  handler satisfies RouteHandlerConfig<"/api/invite/reject">
+}
+
+// Validate ../../src/app/api/invite/request/route.ts
+{
+  const handler = {} as typeof import("../../src/app/api/invite/request/route.js")
+  handler satisfies RouteHandlerConfig<"/api/invite/request">
 }
 
 // Validate ../../src/app/api/market/ingest/klines/route.ts
@@ -488,6 +704,18 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 
 
 
+
+// Validate ../../src/app/admin/layout.tsx
+{
+  const handler = {} as typeof import("../../src/app/admin/layout.js")
+  handler satisfies LayoutConfig<"/admin">
+}
+
+// Validate ../../src/app/docs/layout.tsx
+{
+  const handler = {} as typeof import("../../src/app/docs/layout.js")
+  handler satisfies LayoutConfig<"/docs">
+}
 
 // Validate ../../src/app/layout.tsx
 {

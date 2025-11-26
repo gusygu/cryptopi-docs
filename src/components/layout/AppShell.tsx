@@ -8,9 +8,11 @@ const links = [
   { href: "/matrices", label: "Matrices" },
   { href: "/dynamics", label: "Dynamics" },
   { href: "/settings", label: "Settings" },
+  { href: "/docs", label: "Docs" },     // ⬅️ new
   { href: "/info", label: "Info" },
   { href: "/login", label: "Access" },
 ];
+
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -61,3 +63,4 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+

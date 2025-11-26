@@ -1,4 +1,4 @@
-import { getPool } from "@/lib/db.server";
+import { getPool } from "@/core/db/db";
 import { seedUniverse } from "./seed-universe";
 import { seedHydrate } from "./seed-hydrate";
 

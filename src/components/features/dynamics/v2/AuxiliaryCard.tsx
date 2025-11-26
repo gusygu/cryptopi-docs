@@ -86,10 +86,10 @@ function formatRelative(value: AuxiliaryCardProps["lastUpdated"]) {
 
 function StatBadge({ label, value, hint }: StatBadgeProps) {
   return (
-    <div className="min-w-[96px] rounded-lg border border-emerald-500/25 bg-black/40 px-3 py-2 text-right text-[11px] text-emerald-200/80">
-      <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-300/70">{label}</div>
-      <div className="mt-1 font-mono text-base leading-tight text-emerald-100">{value}</div>
-      {hint ? <div className="mt-1 text-[10px] text-emerald-300/60">{hint}</div> : null}
+    <div className="rounded-2xl border border-emerald-500/25 bg-[#02080e]/80 px-4 py-3 text-right text-sm text-emerald-200/80 shadow-[0_0_16px_rgba(16,185,129,0.08)]">
+      <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">{label}</div>
+      <div className="mt-1 font-mono text-xl leading-tight text-emerald-100">{value}</div>
+      {hint ? <div className="mt-1 text-[10px] text-emerald-300/55">{hint}</div> : null}
     </div>
   );
 }
@@ -170,7 +170,7 @@ export default function AuxiliaryCard({
 
   const [strState, setStrState] = useState<StrAuxState>({ loading: false, error: null, metrics: null });
 
-  const meaMetric = metrics?.mea ?? null;
+  const mooMetric = (metrics as any)?.moo ?? metrics?.mea ?? null;
   const strMetric = metrics?.str ?? null;
   const cinStats = cin ?? metrics?.cin ?? null;
 
@@ -253,11 +253,11 @@ export default function AuxiliaryCard({
   const status =
     loading || strState.loading ? "Loading auxiliary data..." : `Snapshot - ${formatRelative(lastUpdated)}`;
 
-  const formattedMea = meaMetric
-    ? formatNumber(meaMetric.value, { precision: 4, fallback: "-" })
+  const formattedMoo = mooMetric
+    ? formatNumber(mooMetric.value, { precision: 4, fallback: "-" })
     : "-";
 
-  const formattedTier = meaMetric?.tier ? meaMetric.tier : "n/a";
+  const formattedTier = mooMetric?.tier ? mooMetric.tier : "n/a";
   const formattedGfm = strMetric ? formatNumber(strMetric.gfm, { precision: 4, fallback: "-" }) : "-";
 
   const strMetricsList = useMemo(() => {
@@ -320,57 +320,77 @@ export default function AuxiliaryCard({
       )}
       contentClassName="flex flex-col gap-6"
     >
-      <div className="flex flex-col gap-4 rounded-2xl border border-emerald-500/25 bg-[#050b15]/90 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_0.9fr]">
+        <section className="rounded-2xl border border-emerald-500/25 bg-[#050b15]/90 p-5 shadow-[0_0_32px_rgba(16,185,129,0.12)]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.4em] text-emerald-300/70">MOO snapshot</div>
+              <div className="mt-2 text-xs uppercase tracking-[0.3em] text-emerald-200/60">Value</div>
+              <div className="mt-1 font-mono text-4xl leading-none text-emerald-100">{formattedMoo}</div>
+              <div className="mt-2 text-[11px] uppercase tracking-[0.25em] text-emerald-300/70">
+                Tier <span className="text-emerald-100">{formattedTier}</span>
+              </div>
+              <div className="mt-2 text-xs text-emerald-300/60">Focus {A}/{B}</div>
+            </div>
+            <div className="flex flex-1 flex-wrap justify-end gap-3 min-w-[240px]">
+              <StatBadge label="Candidates" value={candidateCount} hint="Eligible STR pairs" />
+              <StatBadge label="Universe" value={universeCount} hint="Coins in scope" />
+              <StatBadge
+                label="Opening"
+                value={
+                  openingValue != null
+                    ? formatNumber(openingValue, { precision: 4, fallback: "-" })
+                    : "-"
+                }
+                hint="Benchmark snapshot"
+              />
+            </div>
+          </div>
+          <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-[#04101a]/80 p-4">
+            <div className="mb-3 text-[11px] uppercase tracking-[0.35em] text-emerald-200">STR-Aux metrics</div>
+            {strState.error ? (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-[11px] text-amber-200">
+                {strState.error}
+              </div>
+            ) : strState.loading ? (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <div
+                    key={`str-skeleton-${idx}`}
+                    className="h-20 rounded-xl border border-emerald-500/25 bg-emerald-500/10 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <StrMetricItem label="GFM" value={formattedGfm} hint="Absolute mode (price)" />
+                {strMetricsList.map((item) => (
+                  <StrMetricItem key={item.label} label={item.label} value={item.value} hint={item.hint} />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+        <section className="rounded-2xl border border-emerald-500/25 bg-[#030a12]/85 p-5 space-y-4">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.4em] text-emerald-300/70">MEA</div>
-            <div className="mt-2 text-xs uppercase tracking-[0.35em] text-emerald-200/60">MEA-Value</div>
-            <div className="mt-1 font-mono text-3xl leading-none text-emerald-100">{formattedMea}</div>
-            <div className="mt-2 text-[11px] uppercase tracking-[0.25em] text-emerald-300/70">
-              Tier - <span className="text-emerald-100">{formattedTier}</span>
-            </div>
+            <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/70">Snapshot state</div>
+            <div className="mt-1 text-sm text-emerald-100">Updated {formatRelative(lastUpdated)}</div>
           </div>
-          <div className="flex flex-wrap justify-end gap-3">
-            <StatBadge label="Candidates" value={candidateCount} hint="Eligible STR pairs" />
-            <StatBadge label="Universe" value={universeCount} hint="Coins in scope" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <StatBadge label="GFM (abs)" value={formattedGfm} hint="Current str-aux mode" />
             <StatBadge
-              label="Opening"
-              value={
-                openingValue != null
-                  ? formatNumber(openingValue, { precision: 4, fallback: "-" })
-                  : "-"
-              }
-              hint="Benchmark snapshot"
+              label="Velocity"
+              value={formatNumber(strMetric?.vTendency, { precision: 3, fallback: "-" })}
+              hint="Directional tendency"
             />
+            <StatBadge
+              label="Shift"
+              value={formatNumber(strMetric?.shift, { precision: 3, fallback: "-" })}
+              hint="Shift composite"
+            />
+            <StatBadge label="CIN tracked" value={derivedCinRows.length} hint="Coins with CIN stats" />
           </div>
-        </div>
-
-        <div className="h-px w-full bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
-
-        <div className="rounded-2xl border border-emerald-500/35 bg-[#04101a]/80 p-4">
-          <div className="mb-3 text-[11px] uppercase tracking-[0.35em] text-emerald-200">STR-Aux</div>
-          {strState.error ? (
-            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-[11px] text-amber-200">
-              {strState.error}
-            </div>
-          ) : strState.loading ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {Array.from({ length: 9 }).map((_, idx) => (
-                <div
-                  key={`str-skeleton-${idx}`}
-                  className="h-16 rounded-xl border border-emerald-500/20 bg-emerald-500/10 animate-pulse"
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <StrMetricItem label="GFM" value={formattedGfm} hint="Absolute mode (price)" />
-              {strMetricsList.map((item) => (
-                <StrMetricItem key={item.label} label={item.label} value={item.value} hint={item.hint} />
-              ))}
-            </div>
-          )}
-        </div>
+        </section>
       </div>
 
       <div className="rounded-2xl border border-emerald-500/25 bg-[#050b15]/85 p-4">

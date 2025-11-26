@@ -2,7 +2,7 @@
  * Hydrates matrices from current id_pct_latest for all coins.
  * Creates a new cin_session, registers matrices, and fills mat_cell.
  */
-import { db } from "@/lib/db.server";
+import { db } from "@/core/db/db";
 
 type Sym = { symbol: string };
 type SessionRow = { session_id: string };

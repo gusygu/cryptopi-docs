@@ -702,6 +702,14 @@ export default function AssetIdentity({
                   precision: 3,
                 }),
               },
+              {
+                key: "ref",
+                label: "ref",
+                value: formatNumber(pair.metrics.ref, {
+                  fallback: "-",
+                  precision: 4,
+                }),
+              },
             ];
             return (
               <PairCard
@@ -749,6 +757,14 @@ export default function AssetIdentity({
                 value: formatPercent(pair.metrics.pct24h, {
                   fallback: "-",
                   precision: 3,
+                }),
+              },
+              {
+                key: "ref",
+                label: "ref",
+                value: formatNumber(pair.metrics.ref, {
+                  fallback: "-",
+                  precision: 4,
                 }),
               },
             ];

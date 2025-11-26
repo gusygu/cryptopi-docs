@@ -25,6 +25,7 @@ import type {
 } from "@/core/features/matrices/matrices";
 import { query } from "@/core/db/pool_server";
 
+import { requireUserSession } from "@/app/(server)/auth/session";
 // keep these aliases so TS treats the imports as “used” (still type-only)
 type _FrozenPairKey = FrozenPairKey;
 type _FrozenSetBuilder = typeof buildFrozenSetFromFlags;
@@ -354,6 +355,7 @@ export async function buildMatricesLatestPayload(
 }
 
 export async function GET(req: Request) {
+  const session = await requireUserSession();
   const q = parseQuery(req);
   const payload = await buildMatricesLatestPayload(q);
   const status = payload.ok ? 200 : 500;

@@ -3,6 +3,8 @@ import type { PoolClient, QueryResult, QueryResultRow } from "pg";
 import { db, getPool, query, withClient } from "./pool_server";
 
 export { db, getPool, query, withClient } from "./pool_server";
+export { sql } from "./session";
+export type { SqlTag } from "./session";
 
 /** ------- Dynamics matrices (kept signatures) ------- */
 // Optional env override; defaults to our canonical table

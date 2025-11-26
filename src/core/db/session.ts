@@ -1,19 +1,23 @@
 // Session + timeframe utilities (shared across CLI/server) + lightweight SQL tag helper.
 
 import type { QueryResult } from "pg";
-import { db } from "@/core/db/db";
-import { getPool } from "@/core/db/pool_server";
+import { db, getPool, withClient } from "./pool_server";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { randomBytes } from "crypto";
 
 /* ����������������������������� Tagged SQL helper �������������������������� */
 
-export async function sql<T = any>(
+type SqlTransactionTag = <T = any>(
   strings: TemplateStringsArray,
   ...values: any[]
-): Promise<T[]> {
-  const pool = getPool();
+) => Promise<T[]>;
+
+export interface SqlTag extends SqlTransactionTag {
+  begin<T>(fn: (tx: SqlTransactionTag) => Promise<T>): Promise<T>;
+}
+
+function compileSql(strings: TemplateStringsArray, values: any[]) {
   let text = "";
   const params: any[] = [];
   for (let i = 0; i < strings.length; i++) {
@@ -23,9 +27,49 @@ export async function sql<T = any>(
       text += `$${params.length}`;
     }
   }
-  const res: QueryResult<T> = await pool.query<T>(text, params);
+  return { text, params };
+}
+
+async function runSqlTag<T>(
+  strings: TemplateStringsArray,
+  values: any[]
+): Promise<T[]> {
+  const { text, params } = compileSql(strings, values);
+  const res: QueryResult<T> = await getPool().query<T>(text, params);
   return res.rows;
 }
+
+export const sql = Object.assign(
+  async function sql<T = any>(
+    strings: TemplateStringsArray,
+    ...values: any[]
+  ): Promise<T[]> {
+    return runSqlTag<T>(strings, values);
+  },
+  {
+    begin: async <T>(fn: (tx: SqlTransactionTag) => Promise<T>): Promise<T> => {
+      return withClient(async (client) => {
+        await client.query("BEGIN");
+        try {
+          const tx: SqlTransactionTag = async <R = any>(
+            strings: TemplateStringsArray,
+            ...values: any[]
+          ): Promise<R[]> => {
+            const { text, params } = compileSql(strings, values);
+            const res: QueryResult<R> = await client.query<R>(text, params);
+            return res.rows;
+          };
+          const result = await fn(tx);
+          await client.query("COMMIT");
+          return result;
+        } catch (err) {
+          await client.query("ROLLBACK");
+          throw err;
+        }
+      });
+    },
+  }
+) as SqlTag;
 
 /* ����������������������������� Duration & Windows �������������������������� */
 
@@ -197,4 +241,3 @@ export function parseNowOrMs(s?: string): number {
   if (Number.isFinite(n)) return n;
   return parseDuration(s); // allow "5m" here too
 }
-

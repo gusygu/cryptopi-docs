@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { verifyBinanceAccount } from "@/app/api/market/providers/binance/account/test/verify";
 import { clearWalletCache } from "@/core/sources/binanceAccount";
 import { deleteWallet, getWallet, maskKey, setWallet } from "@/lib/wallet/registry";
+import { getCurrentUser } from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 async function readSessionEmail(): Promise<string | null> {
-  const jar = await cookies();
-  const raw = jar.get("session")?.value ?? "";
-  const email = raw.split("|")[0]?.trim();
-  return email?.length ? email.toLowerCase() : null;
+  const user = await getCurrentUser();
+  return user?.email?.toLowerCase() ?? null;
 }
 
 export async function GET() {

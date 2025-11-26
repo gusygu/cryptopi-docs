@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import {
   resolvePreviewUniverseSnapshot,
   type PreviewUniverseOptions,
 } from "../../shared";
 import { getBinanceWalletBalances } from "@/core/api/market/binance";
+import { getCurrentUser } from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,13 +27,6 @@ const WALLET_DISABLED_RESPONSE = NextResponse.json(
   { status: 403, headers: { "Cache-Control": "no-store" } }
 );
 
-function extractEmail(sessionValue: string | undefined): string | undefined {
-  if (!sessionValue) return undefined;
-  const [first] = sessionValue.split("|");
-  const email = (first ?? "").trim().toLowerCase();
-  return email || undefined;
-}
-
 export async function GET(req: Request) {
   if (process.env.WALLET_ENABLED !== "true") {
     return WALLET_DISABLED_RESPONSE;
@@ -48,9 +41,8 @@ export async function GET(req: Request) {
   const snapshot = await resolvePreviewUniverseSnapshot(options);
   const assets = new Set(snapshot.coins.map(toUpper));
 
-  const jar = await cookies();
-  const sessionValue = jar.get("session")?.value;
-  const email = extractEmail(sessionValue);
+  const user = await getCurrentUser();
+  const email = user?.email?.toLowerCase();
   const walletSnapshot = await getBinanceWalletBalances(email);
 
   const filteredWallets: Record<string, number> = {};

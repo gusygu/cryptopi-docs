@@ -2,7 +2,7 @@
  * Dynamically seeds all base tables based on settings_coin_universe.
  * Fills balances, pair_availability, id_pct_pairs with non-zero data.
  */
-import { db } from "@/lib/db.server";
+import { db } from "@/core/db/db";
 
 type Sym = { symbol: string };
 

@@ -166,3 +166,60 @@ CREATE TABLE IF NOT EXISTS ops.app_ledger (
 );
 CREATE INDEX IF NOT EXISTS ix_ops_app_ledger_topic_time
   ON ops.app_ledger (topic, ts_epoch_ms DESC);
+
+-- === Admin action log ===============================================
+
+CREATE TABLE IF NOT EXISTS ops.admin_action_log (
+  action_id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  performed_by    uuid,               -- optional: auth.user_account.user_id
+  performed_email text,               -- convenience, email string
+  target_user_id  uuid,               -- optional: user affected
+  target_email    text,               -- convenience
+  action_type     text NOT NULL,      -- e.g. 'user.set_admin', 'invite.approve'
+  action_scope    text,               -- e.g. 'users', 'invites', 'auth'
+  message         text,               -- human readable summary
+  meta            jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_admin_action_log_created_at
+  ON ops.admin_action_log (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS ix_admin_action_log_performed_by
+  ON ops.admin_action_log (performed_by);
+
+CREATE INDEX IF NOT EXISTS ix_admin_action_log_target_user_id
+  ON ops.admin_action_log (target_user_id);
+
+-- === Job runs =======================================================
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type WHERE typnamespace = 'ops'::regnamespace AND typname = 'job_status'
+  ) THEN
+    CREATE TYPE ops.job_status AS ENUM ('success', 'error', 'running', 'queued', 'skipped');
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS ops.job_run (
+  run_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_name      text NOT NULL,      -- e.g. 'str-aux/sampler', 'matrices/refresh'
+  job_type      text,               -- e.g. 'ingest', 'maintenance', 'calc'
+  status        ops.job_status NOT NULL,
+  started_at    timestamptz NOT NULL DEFAULT now(),
+  finished_at   timestamptz,
+  duration_ms   integer,
+
+  error_message text,
+  error_stack   text,
+  meta          jsonb NOT NULL DEFAULT '{}'::jsonb,
+
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_job_run_job_name_started_at
+  ON ops.job_run (job_name, started_at DESC);
+
+CREATE INDEX IF NOT EXISTS ix_job_run_status_started_at
+  ON ops.job_run (status, started_at DESC);

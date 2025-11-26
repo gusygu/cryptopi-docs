@@ -19,6 +19,62 @@ type Credentials = { apiKey: string; apiSecret: string };
 export type AccountOptions = {
   email?: string;
 };
+// ---- /api/v3/myTrades -------------------------------------------------------
+
+export type AccountTrade = {
+  id: number;
+  orderId: number;
+  price: string;
+  qty: string;
+  quoteQty: string;
+  commission: string;
+  commissionAsset: string;
+  time: number;        // ms since epoch
+  isBuyer: boolean;
+  isMaker: boolean;
+  isBestMatch: boolean;
+};
+
+export type MyTradesOptions = AccountOptions & {
+  fromId?: number;
+  startTime?: number;  // epoch ms
+  endTime?: number;    // epoch ms
+  limit?: number;
+};
+
+/**
+ * Fetch private trades for a single symbol.
+ * - Uses env or wallet-linked credentials.
+ * - Returns [] on missing creds or error (soft fail).
+ */
+export async function getMyTradesForSymbol(
+  symbol: string,
+  options: MyTradesOptions = {},
+): Promise<AccountTrade[]> {
+  const email = options.email?.toLowerCase() ?? null;
+  const creds = resolveCredentials(email);
+  if (!creds) {
+    const scope = email ? `for ${email}` : "(env)";
+    console.warn(`getMyTradesForSymbol: missing credentials ${scope}`);
+    return [];
+  }
+
+  const query: QueryRecord = {
+    symbol,
+    fromId: options.fromId,
+    startTime: options.startTime,
+    endTime: options.endTime,
+    limit: options.limit ?? 500,
+  };
+
+  try {
+    return await signedGET<AccountTrade[]>("/api/v3/myTrades", query, creds);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "myTrades fetch failed");
+    console.warn(`getMyTradesForSymbol(${symbol}): ${message}`);
+    return [];
+  }
+}
 
 const BASE = process.env.BINANCE_BASE ?? "https://api.binance.com";
 const ENV_API_KEY =
@@ -183,3 +239,74 @@ export async function getAccountBalances(options: AccountOptions = {}): Promise<
 
 // Optional: export the signed helper if other modules need it in the future.
 export const _internal = { signedGET, fetchServerTime, resolveCredentials };
+
+// src/core/features/cin-aux/binanceTrades.ts
+
+const BINANCE_API_KEY = process.env.BINANCE_API_KEY!;
+const BINANCE_API_SECRET = process.env.BINANCE_API_SECRET!;
+const BINANCE_BASE_URL = "https://api.binance.com";
+
+export interface BinanceTrade {
+  symbol: string;
+  id: number;
+  orderId: number;
+  price: string;
+  qty: string;
+  quoteQty: string;
+  commission: string;
+  commissionAsset: string;
+  time: number; // ms since epoch
+  isBuyer: boolean;
+  isMaker: boolean;
+  isBestMatch: boolean;
+}
+
+function signQuery(query: string): string {
+  return crypto
+    .createHmac("sha256", BINANCE_API_SECRET)
+    .update(query)
+    .digest("hex");
+}
+
+export async function fetchMyTradesForSymbol(args: {
+  symbol: string;
+  startTime: number;
+  endTime: number;
+  limit?: number;
+}): Promise<BinanceTrade[]> {
+  if (!BINANCE_API_KEY || !BINANCE_API_SECRET) {
+    throw new Error("Binance API credentials not configured");
+  }
+
+
+  
+  const params: Record<string, string | number> = {
+    symbol: args.symbol.toUpperCase(),
+    timestamp: Date.now(),
+  };
+  if (args.startTime) params.startTime = args.startTime;
+  if (args.endTime) params.endTime = args.endTime;
+  if (args.limit) params.limit = args.limit;
+
+  const query = new URLSearchParams(
+    Object.entries(params).map(([k, v]) => [k, String(v)])
+  ).toString();
+
+  const signature = signQuery(query);
+  const url = `${BINANCE_BASE_URL}/api/v3/myTrades?${query}&signature=${signature}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      "X-MBX-APIKEY": BINANCE_API_KEY,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Binance myTrades HTTP ${res.status}`);
+  }
+
+  const json = (await res.json()) as BinanceTrade[];
+  return json;
+}
+

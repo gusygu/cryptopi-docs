@@ -1,6 +1,8 @@
 // app/api/ops/place/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { pool } from '@/lib/db.server';
+import { NextRequest, NextResponse } from "next/server";
+import { getPool } from "@/core/db/db";
+
+const pool = getPool();
 
 export async function POST(req: NextRequest) {
   const b = await req.json();

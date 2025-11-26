@@ -120,7 +120,13 @@ ADD COLUMN IF NOT EXISTS opening_stamp boolean NOT NULL DEFAULT false,
 ADD COLUMN IF NOT EXISTS opening_session_id uuid,
 ADD COLUMN IF NOT EXISTS opening_ts timestamptz,
 ADD COLUMN IF NOT EXISTS print_stamp boolean NOT NULL DEFAULT false,
-ADD COLUMN IF NOT EXISTS print_ts timestamptz;
+ADD COLUMN IF NOT EXISTS print_ts timestamptz,
+ADD COLUMN IF NOT EXISTS src_symbol text,
+ADD COLUMN IF NOT EXISTS src_trade_id bigint,
+ADD COLUMN IF NOT EXISTS src_side text;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rt_move_src_trade
+  ON cin_aux.rt_move(session_id, src_symbol, src_trade_id);
 
 
 ALTER TABLE cin_aux.rt_lot
@@ -146,3 +152,4 @@ ADD COLUMN IF NOT EXISTS opening_ts timestamptz,
 ADD COLUMN IF NOT EXISTS print_stamp boolean NOT NULL DEFAULT false,
 ADD COLUMN IF NOT EXISTS print_ts timestamptz;
 COMMIT;
+

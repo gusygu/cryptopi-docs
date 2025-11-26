@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import StrAuxClient from "./StrAuxComponent";
 import { resolveSymbolSelection } from "@/core/features/str-aux/symbols";
+import { requireUserSession } from "@/app/(server)/auth/session";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -53,6 +54,7 @@ async function resolveStrAuxSymbols(): Promise<string[]> {
 }
 
 export default async function StrAuxPage() {
+  const session = await requireUserSession();
   const symbols = await resolveStrAuxSymbols();
   return <StrAuxClient symbols={symbols} />;
 }

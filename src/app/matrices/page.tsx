@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import Matrix, { type MatrixCell } from "@/components/features/matrices/Matrix";
 import MooAuxCard from "@/components/features/moo-aux/MooAuxCard";
 import { withAlpha, type FrozenStage } from "@/components/features/matrices/colors";
-import CinMatricesPanel from "@/components/features/cin-aux/CinMatricesPanel";
 
 import {
   MUTED_BACKGROUND,
@@ -19,6 +18,8 @@ import {
   type MatrixColorRules,
 } from "@/app/matrices/colouring";
 import { useSettings, selectCoins } from "@/lib/settings/client";
+import { requireUserSession } from "@/app/(server)/auth/session";
+
 
 const DEFAULT_POLL_MS = 40_000;
 
@@ -282,6 +283,7 @@ const buildQueryString = (params: URLSearchParams): string => {
 };
 
 export default function MatricesPage() {
+  const session = await requireUserSession(); 
   const searchParams = useSearchParams();
   const queryString = useMemo(() => buildQueryString(searchParams), [searchParams]);
   const pollMs = useMemo(() => {
@@ -615,7 +617,6 @@ export default function MatricesPage() {
       <p className="text-sm text-gray-600">
         Manage CIN-AUX operations and view τ (imprint − luggage) per move.
       </p>
-      <CinMatricesPanel defaultSessionId={defaultSessionId} />
     </div>
               <span
                 className="rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.28em]"

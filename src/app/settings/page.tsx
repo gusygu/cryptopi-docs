@@ -6,7 +6,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
 import BinanceLinkCard from "@/components/settings/BinanceLinkCard";
-import CinSessionHelperCard from "@/components/settings/CinSessionHelperCard";
 import { getAll as getAppSettings, setAll as setAppSettings } from "@/lib/settings/server";
 import { DEFAULT_SETTINGS, normalizeCoinUniverse } from "@/lib/settings/schema";
 import { syncCoinUniverseFromBinance } from "@/core/features/markets/coin-universe";
@@ -18,7 +17,7 @@ import {
   type UserSettings,
   type Wallet,
 } from "@/lib/settings/store";
-
+import { requireUserSession } from "@/app/(server)/auth/session";
 // ---------- helpers ----------
 const DEV_SESSION_EMAIL =
   process.env.NEXT_PUBLIC_DEV_SESSION_EMAIL ||
@@ -237,9 +236,8 @@ export default async function SettingsPage({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const jar = await cookies();
-  const sessionVal = jar.get("session")?.value;
-  const email = ensureLoginEmail(sessionVal);
+  const session = await requireUserSession();
+  const email = session.email;
 
   const s: UserSettings = getUserSettings(email);
   const app = await getAppSettings();
@@ -288,17 +286,6 @@ export default async function SettingsPage({
               Error: {decodeURIComponent(err)}
             </div>
           ) : null}
-
-          {/* CIN-AUX session helper */}
-          <section className="rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-md p-4 shadow-sm">
-            <div className="mb-3">
-              <h2 className="text-sm font-semibold">CIN-AUX Session Access</h2>
-              <p className="text-xs text-slate-400">
-                Mint or copy the session identifier (uuid/bigint) you need to operate the CIN widgets on <span className="font-mono text-white/80">/matrices</span>.
-              </p>
-            </div>
-            <CinSessionHelperCard />
-          </section>
 
           {/* UNIVERSE & ENGINE (AppSettings: coins + stats) */}
           <section className="rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-md p-4 shadow-sm">

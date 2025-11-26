@@ -2,10 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSettings } from "@/lib/settings/client";
-import { getState, requestRefresh, setEnabled, subscribe, type PollerState } from "@/lib/pollerClient";
+import {
+  getState,
+  requestRefresh,
+  setEnabled,
+  subscribe,
+  type PollerState,
+} from "@/lib/pollerClient";
 import { getMuted, setMuted, subscribeMet } from "@/lib/metronome";
 import type { ReportLevel } from "@/lib/types";
 
@@ -22,14 +28,33 @@ type VitalsState = {
   statusTs?: number;
 };
 
-const NAV_ITEMS = [
+type SessionInfo = {
+  ok: boolean;
+  email: string | null;
+  nickname: string | null;
+  isAdmin: boolean;
+};
+
+type NavLink = { href: string; label: string };
+
+const FEATURE_LINKS: NavLink[] = [
   { href: "/", label: "Home" },
   { href: "/matrices", label: "Matrices" },
   { href: "/dynamics", label: "Dynamics" },
+  { href: "/cin", label: "Cin-Aux" },
   { href: "/str-aux", label: "Str-Aux" },
   { href: "/settings", label: "Settings" },
+  { href: "/docs", label: "Docs" },
   { href: "/info", label: "Info" },
 ] as const;
+
+const DEV_LINKS: NavLink[] = [
+  { href: "/admin", label: "Admin" },
+  { href: "/admin/invites", label: "Invites" },
+  { href: "/admin/users", label: "Users" },
+  { href: "/admin/jobs", label: "Jobs" },
+  { href: "/admin/actions", label: "Actions" },
+];
 
 const API_ENDPOINTS = [
   { href: "/api/matrices/latest", label: "Matrices: latest" },
@@ -43,6 +68,11 @@ const API_ENDPOINTS = [
   { href: "/api/vitals/health", label: "Vitals health" },
   { href: "/api/vitals/status", label: "Vitals status" },
 ] as const;
+
+function isRouteActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 function safeGetPollerState(): PollerState | null {
   if (typeof window === "undefined") return null;
@@ -80,10 +110,14 @@ function formatSince(ts?: number) {
 }
 
 function badgeTone(level: "ok" | "warn" | "err" | "neutral" | "muted") {
-  if (level === "ok") return "border-emerald-500/40 bg-emerald-600/20 text-emerald-100";
-  if (level === "warn") return "border-amber-500/40 bg-amber-500/15 text-amber-100";
-  if (level === "err") return "border-rose-500/40 bg-rose-600/20 text-rose-100";
-  if (level === "neutral") return "border-sky-500/40 bg-sky-500/15 text-sky-100";
+  if (level === "ok")
+    return "border-emerald-500/40 bg-emerald-600/20 text-emerald-100";
+  if (level === "warn")
+    return "border-amber-500/40 bg-amber-500/15 text-amber-100";
+  if (level === "err")
+    return "border-rose-500/40 bg-rose-600/20 text-rose-100";
+  if (level === "neutral")
+    return "border-sky-500/40 bg-sky-500/15 text-sky-100";
   return "border-zinc-600/40 bg-zinc-800/60 text-zinc-200";
 }
 
@@ -120,7 +154,9 @@ export default function HomeBar({ className = "" }: { className?: string }) {
     statusLevel: null,
     statusCounts: null,
   });
+  const [session, setSession] = useState<SessionInfo | null>(null);
 
+  // Initial poller state sync
   useEffect(() => {
     const state = safeGetPollerState();
     if (!state) return;
@@ -143,37 +179,63 @@ export default function HomeBar({ className = "" }: { className?: string }) {
 
   const audioRef = useRef<AudioContext | null>(null);
 
-  const playClick = useCallback((count: number) => {
-    if (typeof window === "undefined" || metMuteRef.current) return;
-    let ctx = audioRef.current;
-    if (!ctx) {
+  const playClick = useCallback(
+    (count: number) => {
+      if (typeof window === "undefined" || metMuteRef.current) return;
+      let ctx = audioRef.current;
+      if (!ctx) {
+        try {
+          ctx = new AudioContext({ latencyHint: "interactive" });
+          audioRef.current = ctx;
+        } catch {
+          return;
+        }
+      }
+      if (ctx.state === "suspended") {
+        void ctx.resume().catch(() => {});
+      }
+      const start = ctx.currentTime;
+      for (let i = 0; i < count; i++) {
+        const tickStart = start + i * 0.24;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(i === 0 ? 1320 : 880, tickStart);
+        gain.gain.setValueAtTime(0.0001, tickStart);
+        gain.gain.exponentialRampToValueAtTime(0.4, tickStart + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, tickStart + 0.18);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(tickStart);
+        osc.stop(tickStart + 0.2);
+      }
+    },
+    []
+  );
+
+  // Load current session info from /api/auth/session
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSession() {
       try {
-        ctx = new AudioContext({ latencyHint: "interactive" });
-        audioRef.current = ctx;
+        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as SessionInfo;
+        if (!cancelled) setSession(data);
       } catch {
-        return;
+        // ignore, leave as null
       }
     }
-    if (ctx.state === "suspended") {
-      void ctx.resume().catch(() => {});
-    }
-    const start = ctx.currentTime;
-    for (let i = 0; i < count; i++) {
-      const tickStart = start + i * 0.24;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(i === 0 ? 1320 : 880, tickStart);
-      gain.gain.setValueAtTime(0.0001, tickStart);
-      gain.gain.exponentialRampToValueAtTime(0.4, tickStart + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, tickStart + 0.18);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(tickStart);
-      osc.stop(tickStart + 0.2);
-    }
+
+    loadSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Poller event subscription
   useEffect(() => {
     const unsub = subscribe((ev) => {
       if (ev.type === "state") {
@@ -199,6 +261,7 @@ export default function HomeBar({ className = "" }: { className?: string }) {
     };
   }, [playClick]);
 
+  // Metronome subscription
   useEffect(() => {
     const unsub = subscribeMet((ev) => {
       if (ev.type === "metronome") setMetMuteState(ev.muted);
@@ -217,11 +280,21 @@ export default function HomeBar({ className = "" }: { className?: string }) {
         fetch("/api/vitals/status", { cache: "no-store" }).catch(() => null),
       ]);
 
-      const healthJson = healthRes && healthRes.ok ? await healthRes.json().catch(() => null) : null;
-      const statusJson = statusRes && statusRes.ok ? await statusRes.json().catch(() => null) : null;
+      const healthJson =
+        healthRes && healthRes.ok
+          ? await healthRes.json().catch(() => null)
+          : null;
+      const statusJson =
+        statusRes && statusRes.ok
+          ? await statusRes.json().catch(() => null)
+          : null;
 
-      const healthOk = healthJson ? Boolean(healthJson.ok ?? (healthJson.db === "up")) : null;
-      const healthDb = healthJson ? String(healthJson.db ?? healthJson.status ?? "").toLowerCase() || null : null;
+      const healthOk = healthJson
+        ? Boolean(healthJson.ok ?? healthJson.db === "up")
+        : null;
+      const healthDb = healthJson
+        ? String(healthJson.db ?? healthJson.status ?? "").toLowerCase() || null
+        : null;
 
       let statusLevel: ReportLevel | null = null;
       let statusCounts: VitalsState["statusCounts"] = null;
@@ -264,6 +337,7 @@ export default function HomeBar({ className = "" }: { className?: string }) {
     }
   }, []);
 
+  // Vitals auto-refresh
   useEffect(() => {
     loadVitals();
     const unsub = subscribe((ev) => {
@@ -275,15 +349,17 @@ export default function HomeBar({ className = "" }: { className?: string }) {
         loadVitals();
       }
     });
-    const timer = typeof window !== "undefined"
-      ? window.setInterval(() => loadVitals(), 300_000)
-      : null;
+    const timer =
+      typeof window !== "undefined"
+        ? window.setInterval(() => loadVitals(), 300_000)
+        : null;
     return () => {
       unsub();
       if (timer != null) window.clearInterval(timer);
     };
   }, [loadVitals]);
 
+  // Pulse decay
   useEffect(() => {
     if (!pulse) return;
     const timer = window.setTimeout(() => setPulse(null), 420);
@@ -298,9 +374,15 @@ export default function HomeBar({ className = "" }: { className?: string }) {
       (settings?.timing?.autoRefreshMs ?? baseDuration * 1000) / 1000
     )
   );
-  const progressPct = countdownSec != null
-    ? Math.min(100, Math.max(0, ((baseDuration - countdownSec) / baseDuration) * 100))
-    : autoOn ? 0 : 100;
+  const progressPct =
+    countdownSec != null
+      ? Math.min(
+          100,
+          Math.max(0, ((baseDuration - countdownSec) / baseDuration) * 100)
+        )
+      : autoOn
+      ? 0
+      : 100;
 
   const loopNumber = Math.floor(cyclesCompleted / 3) + 1;
 
@@ -314,6 +396,17 @@ export default function HomeBar({ className = "" }: { className?: string }) {
     }
   }, []);
 
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore errors, we'll redirect anyway
+    }
+    window.location.href = "/auth?logout=1";
+  }, []);
+
+  const showDevNav = !!session?.isAdmin;
+
   return (
     <div
       className={`sticky top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur ${className}`}
@@ -321,30 +414,59 @@ export default function HomeBar({ className = "" }: { className?: string }) {
     >
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 px-4 py-3 text-xs text-zinc-100 sm:text-sm">
         {/* Brand + navigation */}
-        <div className="flex flex-1 flex-wrap items-center gap-2">
-          <Link href="/" className="text-sm font-semibold tracking-tight text-emerald-200">
+        <div className="flex flex-1 flex-wrap items-start gap-2">
+          <Link
+            href="/"
+            className="text-sm font-semibold tracking-tight text-emerald-200"
+          >
             CryptoPi Dynamics
           </Link>
-          <nav className="flex flex-wrap items-center gap-1" aria-label="Primary">
-            {NAV_ITEMS.map((item) => {
-              const active =
-                pathname === item.href ||
-                (item.href !== "/" && pathname.startsWith(`${item.href}/`));
-              const cls = active
-                ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-100"
-                : "border-zinc-700/50 bg-zinc-900/70 text-zinc-200 hover:border-emerald-400/40 hover:text-emerald-100";
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={`rounded-md border px-2.5 py-1 transition ${cls}`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+          <div className="flex flex-1 flex-col gap-1">
+            <nav
+              className="flex flex-wrap items-center gap-1"
+              aria-label="Primary"
+            >
+              {FEATURE_LINKS.map((item) => {
+                const active = isRouteActive(pathname, item.href);
+                const cls = active
+                  ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-100"
+                  : "border-zinc-700/50 bg-zinc-900/70 text-zinc-200 hover:border-emerald-400/40 hover:text-emerald-100";
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`rounded-md border px-2.5 py-1 text-xs transition sm:text-sm ${cls}`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            {showDevNav ? (
+              <nav
+                className="flex flex-wrap items-center gap-1 text-[11px]"
+                aria-label="Developer"
+              >
+                {DEV_LINKS.map((item) => {
+                  const active = isRouteActive(pathname, item.href);
+                  const cls = active
+                    ? "border-sky-500/60 bg-sky-600/20 text-sky-100"
+                    : "border-zinc-700/50 bg-zinc-900/60 text-zinc-200 hover:border-sky-500/40 hover:text-sky-100";
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      className={`rounded-md border px-2 py-1 transition ${cls}`}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+            ) : null}
+          </div>
           <div className="relative">
             <label className="sr-only" htmlFor="homebar-api-select">
               API quick navigation
@@ -367,6 +489,36 @@ export default function HomeBar({ className = "" }: { className?: string }) {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Session pill / Sign-in */}
+        <div className="ml-2 flex items-center">
+          {session?.email ? (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-full border border-zinc-600/60 bg-zinc-900/70 px-2 py-0.5 text-[10px] text-zinc-100 sm:text-xs">
+                {session.nickname || session.email}
+                {session.isAdmin ? (
+                  <span className="ml-1 rounded-full bg-emerald-600/30 px-1.5 text-[9px] uppercase tracking-wide text-emerald-100">
+                    admin
+                  </span>
+                ) : null}
+              </span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-md border border-zinc-600/60 bg-zinc-900/70 px-2 py-0.5 text-[10px] text-zinc-300 transition hover:border-rose-500/60 hover:bg-rose-600/20 hover:text-rose-100 sm:text-xs"
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/auth"
+              className="text-[11px] text-zinc-300 underline-offset-2 hover:text-emerald-200 hover:underline sm:text-xs"
+            >
+              Sign in
+            </Link>
+          )}
         </div>
 
         {/* Poller controls */}
@@ -410,15 +562,22 @@ export default function HomeBar({ className = "" }: { className?: string }) {
               Metronome&nbsp;{metMute ? "OFF" : "ON"}
             </button>
           </div>
-          <div className="hidden h-8 w-px bg-zinc-700/60 sm:block" aria-hidden />
+          <div
+            className="hidden h-8 w-px bg-zinc-700/60 sm:block"
+            aria-hidden
+          />
           <div className="flex flex-col text-[11px] leading-tight sm:text-xs">
             <div className="flex items-center gap-1 font-mono uppercase tracking-wide text-emerald-200/80">
-              <span>{countdownSec != null ? formatCountdown(countdownSec) : "Paused"}</span>
+              <span>
+                {countdownSec != null
+                  ? formatCountdown(countdownSec)
+                  : "Paused"}
+              </span>
               <span className="text-[10px] text-zinc-400">
                 / {formatCountdown(settingsCycle)}
               </span>
             </div>
-            <div className="flex items-center gap-1 text-[10px] text-zinc-400">
+            <div className="flex items-center gap-1 text-[10px] text-zinc-400 sm:text-[11px]">
               <span>Cycle {romanPhase(phase)}</span>
               <span>&middot;</span>
               <span>Loop {loopNumber}</span>
@@ -429,10 +588,15 @@ export default function HomeBar({ className = "" }: { className?: string }) {
                       ? "bg-emerald-400 shadow-[0_0_6px_1px_rgba(16,185,129,0.55)]"
                       : "bg-emerald-500/80"
                   }`}
-                  aria-label={pulse.mode === "double" ? "Loop tick" : "Cycle tick"}
+                  aria-label={
+                    pulse.mode === "double" ? "Loop tick" : "Cycle tick"
+                  }
                 />
               ) : (
-                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-zinc-700/80" aria-hidden />
+                <span
+                  className="inline-flex h-2.5 w-2.5 rounded-full bg-zinc-700/80"
+                  aria-hidden
+                />
               )}
             </div>
             <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-zinc-800/80">
@@ -447,33 +611,51 @@ export default function HomeBar({ className = "" }: { className?: string }) {
         {/* Status / vitals */}
         <div className="flex min-w-[220px] flex-none flex-col gap-1 rounded-lg border border-white/10 bg-zinc-950/70 px-3 py-2 text-[11px] sm:text-xs">
           <div className="flex items-center justify-between gap-2">
-            <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-[2px] font-medium ${badgeTone(
-              vitals.healthOk == null ? "muted" : vitals.healthOk ? "ok" : "err"
-            )}`}>
+            <span
+              className={`inline-flex items-center gap-1 rounded-md border px-2 py-[2px] font-medium ${badgeTone(
+                vitals.healthOk == null
+                  ? "muted"
+                  : vitals.healthOk
+                  ? "ok"
+                  : "err"
+              )}`}
+            >
               <span>Health</span>
               <span className="font-mono uppercase">
-                {vitals.healthDb ?? (vitals.healthOk == null ? "—" : vitals.healthOk ? "up" : "down")}
+                {vitals.healthDb ??
+                  (vitals.healthOk == null
+                    ? "—"
+                    : vitals.healthOk
+                    ? "up"
+                    : "down")}
               </span>
             </span>
-            <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-[2px] font-medium ${badgeTone(
-              vitals.statusLevel ?? (vitals.loading ? "neutral" : "muted")
-            )}`}>
+            <span
+              className={`inline-flex items-center gap-1 rounded-md border px-2 py-[2px] font-medium ${badgeTone(
+                vitals.statusLevel ?? (vitals.loading ? "neutral" : "muted")
+              )}`}
+            >
               <span>Status</span>
               <span className="font-mono uppercase">
-                {vitals.statusLevel ? levelToLabel(vitals.statusLevel) : vitals.loading ? "loading" : "—"}
+                {vitals.statusLevel
+                  ? levelToLabel(vitals.statusLevel)
+                  : vitals.loading
+                  ? "loading"
+                  : "—"}
               </span>
             </span>
           </div>
           <div className="flex items-center justify-between text-[10px] text-zinc-400 sm:text-[11px]">
-            <span>
-              Updated {formatSince(vitals.healthTs ?? vitals.statusTs)}
-            </span>
+            <span>Updated {formatSince(vitals.healthTs ?? vitals.statusTs)}</span>
             {vitals.statusCounts ? (
               <span>
-                ok {vitals.statusCounts.ok} · warn {vitals.statusCounts.warn} · err {vitals.statusCounts.err}
+                ok {vitals.statusCounts.ok} · warn {vitals.statusCounts.warn} ·
+                err {vitals.statusCounts.err}
               </span>
             ) : (
-              <span>{vitals.loading ? "Fetching…" : vitals.error ? "Error" : "—"}</span>
+              <span>
+                {vitals.loading ? "Fetching…" : vitals.error ? "Error" : "—"}
+              </span>
             )}
           </div>
           {vitals.error ? (

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStatus, startTicker, stopTicker } from '@/lab/legacy/sampler/binanceTicker';
+import { getStatus, startTicker, stopTicker } from 'legacy/sampler/binanceTicker';
 
 export const dynamic = 'force-dynamic';
 

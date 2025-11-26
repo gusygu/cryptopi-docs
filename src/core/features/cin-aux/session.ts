@@ -31,6 +31,57 @@ type CinSessionRow = {
   closing_profit_usdt: string | null;
 };
 
+type CinBalanceColumnMap = {
+  openingPrincipal: string;
+  openingProfit: string;
+  closingPrincipal: string;
+  closingProfit: string;
+};
+
+let cachedBalanceColumns: CinBalanceColumnMap | null = null;
+
+async function detectCinBalanceColumnNames(): Promise<CinBalanceColumnMap> {
+  if (cachedBalanceColumns) return cachedBalanceColumns;
+  const pool = getPool();
+  const q = await pool.query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'strategy_aux'
+      AND table_name = 'cin_balance'
+  `);
+  const names = new Set<string>(q.rows.map((r: { column_name: string }) => r.column_name));
+  const pick = (candidates: string[], label: string) => {
+    for (const name of candidates) {
+      if (names.has(name)) return name;
+    }
+    throw new Error(`cin_balance missing ${label} column (checked: ${candidates.join(", ")})`);
+  };
+
+  cachedBalanceColumns = {
+    openingPrincipal: pick(["opening_principal", "opening_principal_usdt"], "opening_principal"),
+    openingProfit: pick(["opening_profit", "opening_profit_usdt"], "opening_profit"),
+    closingPrincipal: pick(["closing_principal", "closing_principal_usdt"], "closing_principal"),
+    closingProfit: pick(["closing_profit", "closing_profit_usdt"], "closing_profit"),
+  };
+
+  return cachedBalanceColumns;
+}
+
+function buildAggregateJoin(columns: CinBalanceColumnMap): string {
+  return `
+    LEFT JOIN (
+      SELECT
+        session_id::text AS session_join_key,
+        SUM(${columns.openingPrincipal}) AS opening_principal_usdt,
+        SUM(${columns.openingProfit})    AS opening_profit_usdt,
+        SUM(${columns.closingPrincipal}) AS closing_principal_usdt,
+        SUM(${columns.closingProfit})    AS closing_profit_usdt
+      FROM strategy_aux.cin_balance
+      GROUP BY session_id::text
+    ) r ON s.session_id::text = r.session_join_key
+  `;
+}
+
 async function querySessionIdType(): Promise<string> {
   const pool = getPool();
   const q = await pool.query(`
@@ -72,19 +123,8 @@ export async function fetchCinSessions(opts?: { limit?: number }): Promise<{
     FROM strategy_aux.cin_session s
   `;
   const viewJoin = `
-    LEFT JOIN strategy_aux.v_cin_session_rollup r USING (session_id)
-  `;
-  const fallbackJoin = `
-    LEFT JOIN (
-      SELECT
-        session_id,
-        SUM(opening_principal) AS opening_principal_usdt,
-        SUM(opening_profit)    AS opening_profit_usdt,
-        SUM(closing_principal) AS closing_principal_usdt,
-        SUM(closing_profit)    AS closing_profit_usdt
-      FROM strategy_aux.cin_balance
-      GROUP BY session_id
-    ) r USING (session_id)
+    LEFT JOIN strategy_aux.v_cin_session_rollup r
+      ON s.session_id::text = r.session_id::text
   `;
   const tail = `
     ORDER BY s.started_at DESC NULLS LAST, s.session_id::text DESC
@@ -96,7 +136,9 @@ export async function fetchCinSessions(opts?: { limit?: number }): Promise<{
     q = await pool.query(`${baseSelect} ${viewJoin} ${tail}`, [limit]);
   } catch (err: unknown) {
     const code = typeof err === "object" && err ? (err as { code?: string }).code : undefined;
-    if (code !== "42P01") throw err;
+    if (code !== "42P01" && code !== "42703" && code !== "42883") throw err;
+    const columns = await detectCinBalanceColumnNames();
+    const fallbackJoin = buildAggregateJoin(columns);
     q = await pool.query(`${baseSelect} ${fallbackJoin} ${tail}`, [limit]);
   }
 

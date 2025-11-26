@@ -1,6 +1,21 @@
 import crypto from 'crypto';
-import { withTx } from '@/lib/db.server';
+import type { PoolClient } from 'pg';
+import { withClient } from '@/core/db/db';
 import { BinanceClient } from '@/lib/binance';
+
+async function withTx<T>(fn: (client: PoolClient) => Promise<T>) {
+  return withClient(async (client) => {
+    await client.query('BEGIN');
+    try {
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    }
+  });
+}
 
 
 function apiKeyHash(key: string) {
