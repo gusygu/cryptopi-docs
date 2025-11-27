@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/core/db/db";
 import { getCurrentUser } from "@/lib/auth/server";
+import {
+  ensureProfileEmailRow,
+  backfillAccountTradesEmail,
+} from "@/core/features/cin-aux/accountScope";
 
 export async function POST(
   _req: NextRequest,
@@ -16,6 +20,9 @@ export async function POST(
         { status: 401 },
       );
     }
+
+    await ensureProfileEmailRow(user.email, user.nickname ?? null);
+    await backfillAccountTradesEmail(user.email);
 
     const q = await db.query<{ import_moves_from_account_trades: number }>(
       `select cin_aux.import_moves_from_account_trades($1,$2)`,

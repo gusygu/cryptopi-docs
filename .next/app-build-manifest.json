@@ -1,35 +1,25 @@
 {
   "pages": {
+    "/api/audit/cycles/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/audit/cycles/route.js"
+    ],
+    "/api/invite/list/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/invite/list/route.js"
+    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/str-aux/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/str-aux/page.js"
-    ],
-    "/(auth)/auth/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/auth/page.js"
-    ],
     "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/page.js"
-    ],
-    "/api/vitals/health/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/vitals/health/route.js"
-    ],
-    "/api/vitals/status/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/vitals/status/route.js"
     ],
     "/icon/route": [
       "static/chunks/webpack.js",
@@ -46,6 +36,26 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/session/route.js"
     ],
+    "/api/vitals/status/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/vitals/status/route.js"
+    ],
+    "/api/vitals/health/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/vitals/health/route.js"
+    ],
+    "/(auth)/auth/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/auth/page.js"
+    ],
+    "/api/auth/logout/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/logout/route.js"
+    ],
     "/admin/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -56,65 +66,110 @@
       "static/chunks/main-app.js",
       "static/chunks/app/admin/page.js"
     ],
-    "/api/system/refresh/route": [
+    "/dynamics/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/system/refresh/route.js"
+      "static/chunks/app/dynamics/page.js"
+    ],
+    "/api/str-aux/stats/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/str-aux/stats/route.js"
+    ],
+    "/api/dynamics/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/dynamics/route.js"
+    ],
+    "/api/preview/universe/symbols/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/preview/universe/symbols/route.js"
+    ],
+    "/api/matrices/latest/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/matrices/latest/route.js"
+    ],
+    "/api/moo-aux/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/moo-aux/route.js"
+    ],
+    "/api/market/wallet/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/market/wallet/route.js"
+    ],
+    "/audit/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/audit/page.js"
+    ],
+    "/api/audit/sampling/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/audit/sampling/route.js"
+    ],
+    "/admin/audit/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/audit/page.js"
+    ],
+    "/api/admin/audit/activity/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/audit/activity/route.js"
+    ],
+    "/api/admin/audit/errors/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/audit/errors/route.js"
+    ],
+    "/api/admin/audit/reports/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/audit/reports/route.js"
+    ],
+    "/api/admin/audit/vitals/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/audit/vitals/route.js"
+    ],
+    "/matrices/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/matrices/page.js"
     ],
     "/cin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/cin/page.js"
     ],
+    "/str-aux/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/str-aux/page.js"
+    ],
     "/api/cin-aux/runtime/sessions/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/cin-aux/runtime/sessions/route.js"
     ],
-    "/api/cin-aux/runtime/sessions/[sessionId]/moves/route": [
+    "/api/str-aux/vectors/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/cin-aux/runtime/sessions/[sessionId]/moves/route.js"
+      "static/chunks/app/api/str-aux/vectors/route.js"
     ],
-    "/api/cin-aux/runtime/sessions/[sessionId]/balances/route": [
+    "/api/system/refresh/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/cin-aux/runtime/sessions/[sessionId]/balances/route.js"
+      "static/chunks/app/api/system/refresh/route.js"
     ],
-    "/api/cin-aux/runtime/sessions/[sessionId]/trades/sync/route": [
+    "/api/audit/report/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/cin-aux/runtime/sessions/[sessionId]/trades/sync/route.js"
-    ],
-    "/settings/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/settings/page.js"
-    ],
-    "/api/settings/wallet/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/settings/wallet/route.js"
-    ],
-    "/api/cin-aux/runtime/sessions/[sessionId]/wallet/ingest/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/cin-aux/runtime/sessions/[sessionId]/wallet/ingest/route.js"
-    ],
-    "/api/cin-aux/runtime/sessions/[sessionId]/wallet/refresh/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/cin-aux/runtime/sessions/[sessionId]/wallet/refresh/route.js"
-    ],
-    "/api/cin-aux/runtime/sessions/[sessionId]/prices/refresh/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/cin-aux/runtime/sessions/[sessionId]/prices/refresh/route.js"
-    ],
-    "/api/auth/logout/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/logout/route.js"
+      "static/chunks/app/api/audit/report/route.js"
     ]
   }
 }

@@ -1,5 +1,5 @@
 // src/scripts/smokes/str-aux-ingest-smoke.mts
-/* eslint-disable no-console */
+ 
 import { query, db } from "@/core/db/pool_server";
 
 function ts(ms: number) { return new Date(ms).toISOString(); }

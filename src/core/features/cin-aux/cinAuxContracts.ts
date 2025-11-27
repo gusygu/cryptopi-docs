@@ -80,6 +80,7 @@ export interface CinRuntimeMoveRow {
   pBridgeOutUsdt: string | null;
 
   lotUnitsUsed: string | null;
+  fromUnits: string | null;
 
   traceUsdt: string;
   profitConsumedUsdt: string;
@@ -93,6 +94,13 @@ export interface CinRuntimeMoveRow {
   pnlForMoveUsdt: string | null;     // derived per move PnL if you expose it
   feeRate: string | null;            // optional: fee / executed
   effectivePriceFrom: string | null; // optional: executed / units
+}
+
+export interface CinAssetTauRow {
+  sessionId: number;
+  assetId: string;
+  imprintUsdt: string;
+  luggageUsdt: string;
 }
 
 export interface CinRuntimeMarkPoint {

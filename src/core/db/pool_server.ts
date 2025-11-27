@@ -1,4 +1,5 @@
 import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from "pg";
+import { getServerRequestContext } from "@/lib/server/request-context";
 
 /**
  * Unified PG pool + convenience helpers + lightweight ledgers.
@@ -52,9 +53,12 @@ export const DEFAULT_SEARCH_PATH = [
 
 /* ──────────────── Pool singleton ──────────────── */
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __core_pg_pool__: Pool | undefined;
 }
+
+const CLIENT_CTX_PROP = Symbol("cp_request_ctx");
+type ContextAwareClient = PoolClient & { [CLIENT_CTX_PROP]?: string };
 
 function ensurePool(): Pool {
   if (!global.__core_pg_pool__) {
@@ -72,6 +76,7 @@ function ensurePool(): Pool {
         });
       }
     });
+    patchPoolQuery(pool);
     global.__core_pg_pool__ = pool;
   }
   return global.__core_pg_pool__!;
@@ -84,10 +89,35 @@ export function getDb(): Pool {
   return ensurePool();
 }
 
+async function applyRequestContext(client: PoolClient) {
+  const ctx = getServerRequestContext();
+  const targetKey =
+    ctx && (ctx.userId || ctx.isAdmin)
+      ? `${ctx.userId ?? ""}|${ctx.isAdmin ? "1" : "0"}`
+      : "__anon__";
+  const contextual = client as ContextAwareClient;
+  if (contextual[CLIENT_CTX_PROP] === targetKey) {
+    return;
+  }
+  await client.query("select auth.set_request_context($1,$2)", [
+    ctx?.userId ?? null,
+    ctx?.isAdmin ?? false,
+  ]);
+  contextual[CLIENT_CTX_PROP] = targetKey;
+}
+
+function patchPoolQuery(pool: Pool) {
+  const originalQuery = pool.query;
+  pool.query = (async (text: any, params?: any) => {
+    return withClient((client) => client.query(text, params));
+  }) as typeof originalQuery;
+}
+
 /* ──────────────── Query helpers ──────────────── */
 export async function withClient<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await ensurePool().connect();
   try {
+    await applyRequestContext(client);
     return await fn(client);
   } finally {
     client.release();
@@ -98,7 +128,7 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: any[],
 ): Promise<QueryResult<T>> {
-  return ensurePool().query<T>(text, params);
+  return withClient((client) => client.query<T>(text, params));
 }
 
 export const db: Pool = ensurePool();

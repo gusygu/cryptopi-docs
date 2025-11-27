@@ -1,10 +1,17 @@
 // src/app/(server)/auth/session.ts
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
+import {
+  ensureProfileEmailRow,
+  backfillAccountTradesEmail,
+} from "@/core/features/cin-aux/accountScope";
+import { isEmailSuspended } from "@/lib/auth/suspension";
+import { adoptSessionRequestContext } from "@/lib/server/request-context";
 
 export type UserSessionStatus = "active" | "suspended" | "invited" | "unknown";
 
 export type UserSession = {
+  userId: string;
   email: string;
   nickname: string | null;
   isAdmin: boolean;
@@ -24,6 +31,7 @@ function mapUserToSession(user: Awaited<ReturnType<typeof getCurrentUser>>): Use
     (user.email.includes("@") ? user.email.split("@")[0] : user.email);
 
   return {
+    userId: user.user_id,
     email: user.email.toLowerCase(),
     nickname,
     isAdmin: !!user.is_admin,
@@ -33,7 +41,9 @@ function mapUserToSession(user: Awaited<ReturnType<typeof getCurrentUser>>): Use
 
 export async function getCurrentSession(): Promise<UserSession | null> {
   const user = await getCurrentUser({ includeInactive: true });
-  return mapUserToSession(user);
+  const session = mapUserToSession(user);
+  adoptSessionRequestContext(session);
+  return session;
 }
 
 export async function requireUserSession(): Promise<UserSession> {
@@ -41,8 +51,14 @@ export async function requireUserSession(): Promise<UserSession> {
   if (!session) {
     redirect("/auth?err=login_required");
   }
-  if (session.status === "suspended") {
+  if (session.status === "suspended" || isEmailSuspended(session.email)) {
     redirect("/auth?err=account_suspended");
+  }
+  try {
+    await ensureProfileEmailRow(session.email, session.nickname);
+    await backfillAccountTradesEmail(session.email);
+  } catch (err) {
+    console.warn("[requireUserSession] failed to sync profile email:", err);
   }
   return session;
 }

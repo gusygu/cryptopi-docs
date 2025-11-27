@@ -50,6 +50,7 @@ DECLARE
   v_to_asset   text;
   v_notional   numeric;
   v_units      numeric;
+  v_from_units numeric;
   v_side       text;
 BEGIN
   -- Only consider trades not yet mapped to moves for this session
@@ -65,7 +66,10 @@ BEGIN
       t.commission::numeric   AS commission,
       t.commission_asset,
       t.trade_time            AS trade_time,
-      t.is_buyer
+      t.is_buyer,
+      (t.raw ->> 'notionalUsdt')::numeric AS raw_notional_usdt,
+      (t.raw ->> 'fromPriceUsdt')::numeric AS raw_from_price_usdt,
+      (t.raw ->> 'toPriceUsdt')::numeric   AS raw_to_price_usdt
     FROM market.account_trades t
     JOIN market.symbols s ON s.symbol = t.symbol
     LEFT JOIN cin_aux.rt_move m
@@ -80,6 +84,7 @@ BEGIN
       )
   LOOP
     v_side := CASE WHEN r.is_buyer THEN 'BUY' ELSE 'SELL' END;
+    v_from_units := CASE WHEN r.is_buyer THEN r.quote_qty ELSE r.qty END;
 
     IF r.quote_asset = 'USDT' THEN
       v_notional := r.quote_qty;
@@ -93,7 +98,18 @@ BEGIN
         v_units      := r.quote_qty;
       END IF;
     ELSE
-      v_notional   := r.quote_qty;
+      v_notional := COALESCE(
+        r.raw_notional_usdt,
+        CASE
+          WHEN r.raw_from_price_usdt IS NOT NULL THEN r.quote_qty * r.raw_from_price_usdt
+          ELSE NULL
+        END,
+        CASE
+          WHEN r.raw_to_price_usdt IS NOT NULL THEN r.qty * r.raw_to_price_usdt
+          ELSE NULL
+        END,
+        r.quote_qty
+      );
       IF r.is_buyer THEN
         v_from_asset := r.quote_asset;
         v_to_asset   := r.base_asset;
@@ -115,6 +131,7 @@ BEGIN
       dev_ref_usdt,
       comp_principal_usdt, comp_profit_usdt,
       p_bridge_in_usdt, p_bridge_out_usdt,
+      from_units,
       lot_units_used,
       trace_usdt, profit_consumed_usdt, principal_hit_usdt,
       to_units_received,
@@ -134,6 +151,7 @@ BEGIN
       NULL,
       v_notional, 0,
       NULL, NULL,
+      v_from_units,
       NULL,
       0, 0, 0,
       v_units,

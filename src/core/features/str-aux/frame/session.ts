@@ -64,7 +64,7 @@ export type SymbolSession = {
 
 // HMR-safe store
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __STR_AUX_SESS__: Map<string, SymbolSession> | undefined;
 }
 const SESS: Map<string, SymbolSession> =

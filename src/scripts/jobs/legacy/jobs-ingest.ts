@@ -264,7 +264,7 @@ async function main() {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   // Node 18+ has global fetch
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+   
   main().catch((err) => {
     console.error("[ingest] fatal", err);
     process.exit(1);

@@ -6,6 +6,9 @@ ALTER TABLE IF EXISTS cin_aux.rt_move
   ADD COLUMN IF NOT EXISTS src_trade_id bigint,
   ADD COLUMN IF NOT EXISTS src_side text;
 
+ALTER TABLE IF EXISTS cin_aux.rt_move
+  ADD COLUMN IF NOT EXISTS from_units numeric;
+
 ------------------------------------------------------------
 -- 1) Runtime session summary
 ------------------------------------------------------------
@@ -98,6 +101,7 @@ LEFT JOIN ref_total r ON r.session_id = s.session_id;
 -- 4) Derived move PnL view
 ------------------------------------------------------------
 
+DROP VIEW IF EXISTS cin_aux.v_rt_move_pnl;
 CREATE OR REPLACE VIEW cin_aux.v_rt_move_pnl AS
 SELECT
   m.move_id,
@@ -115,6 +119,7 @@ SELECT
   m.comp_profit_usdt,
   m.p_bridge_in_usdt,
   m.p_bridge_out_usdt,
+  m.from_units,
   m.lot_units_used,
   m.trace_usdt,
   m.profit_consumed_usdt,
@@ -131,6 +136,15 @@ SELECT
   m.src_trade_id,
   m.src_side
 FROM cin_aux.rt_move m;
+
+CREATE OR REPLACE VIEW cin_aux.v_rt_asset_tau AS
+SELECT
+  session_id,
+  to_asset AS asset_id,
+  SUM(comp_profit_usdt - profit_consumed_usdt) AS imprint_usdt,
+  SUM(fee_usdt + slippage_usdt + trace_usdt + principal_hit_usdt) AS luggage_usdt
+FROM cin_aux.rt_move
+GROUP BY session_id, to_asset;
 
 ------------------------------------------------------------
 -- 5) Moo alignment view + link table

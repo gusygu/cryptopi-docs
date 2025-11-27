@@ -72,7 +72,7 @@ const METRICS: MetricDescriptor[] = [
     subtitle: "Benchmark vs opening anchor",
     accent: "#f97316",
     accessor: (row) => row.ref_block.top,
-    formatter: (value) => formatPercent(value),
+    formatter: (value) => formatPercent(value, 7),
   },
   {
     key: "ref",
@@ -80,7 +80,7 @@ const METRICS: MetricDescriptor[] = [
     subtitle: "Ref multiplier adjusted by id_pct",
     accent: "#22d3ee",
     accessor: (row) => row.ref_block.bottom,
-    formatter: (value) => formatPercent(value),
+    formatter: (value) => formatPercent(value, 7),
   },
   {
     key: "id_pct",
@@ -88,7 +88,7 @@ const METRICS: MetricDescriptor[] = [
     subtitle: "Current benchmark vs previous",
     accent: "#a855f7",
     accessor: (row) => row.id_pct,
-    formatter: (value) => formatPercent(value),
+    formatter: (value) => formatPercent(value, 7),
   },
   {
     key: "pct_drv",
@@ -96,7 +96,7 @@ const METRICS: MetricDescriptor[] = [
     subtitle: "Change in impulse delta",
     accent: "#fb7185",
     accessor: (row) => row.pct_drv,
-    formatter: (value) => formatPercent(value),
+    formatter: (value) => formatPercent(value, 7),
   },
   {
     key: "delta",
@@ -252,9 +252,9 @@ export default function Matrices({ rows, className = "" }: { rows: ApiMatrixRow[
   );
 }
 
-function formatPercent(value: number | null): string {
+function formatPercent(value: number | null, digits = 2): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  return `${(value * 100).toFixed(2)}%`;
+  return `${(value * 100).toFixed(digits)}%`;
 }
 
 function formatNumber(value: number | null, digits = 6): string {

@@ -1,12 +1,16 @@
 BEGIN;
 -- Runtime trade ledger (BIGINT session lineage per prior strategy_aux)
 CREATE TABLE IF NOT EXISTS cin_aux.rt_session (
-  session_id   BIGSERIAL PRIMARY KEY,
-  window_label TEXT NOT NULL DEFAULT '1h',
-  started_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  ended_at     TIMESTAMPTZ,
-  closed       BOOLEAN NOT NULL DEFAULT FALSE
+  session_id    BIGSERIAL PRIMARY KEY,
+  owner_user_id uuid REFERENCES auth."user"(user_id),
+  window_label  TEXT NOT NULL DEFAULT '1h',
+  started_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ended_at      TIMESTAMPTZ,
+  closed        BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+ALTER TABLE cin_aux.rt_session
+  ADD COLUMN IF NOT EXISTS owner_user_id uuid REFERENCES auth."user"(user_id);
 
 CREATE TABLE IF NOT EXISTS cin_aux.rt_balance (
   session_id        BIGINT NOT NULL REFERENCES cin_aux.rt_session(session_id) ON DELETE CASCADE,
@@ -57,6 +61,7 @@ CREATE TABLE IF NOT EXISTS cin_aux.rt_move (
   comp_profit_usdt    NUMERIC NOT NULL DEFAULT 0,
   p_bridge_in_usdt    NUMERIC,
   p_bridge_out_usdt   NUMERIC,
+  from_units          NUMERIC,
   lot_units_used      NUMERIC,
   trace_usdt          NUMERIC NOT NULL DEFAULT 0,
   profit_consumed_usdt NUMERIC NOT NULL DEFAULT 0,
@@ -121,6 +126,7 @@ ADD COLUMN IF NOT EXISTS opening_session_id uuid,
 ADD COLUMN IF NOT EXISTS opening_ts timestamptz,
 ADD COLUMN IF NOT EXISTS print_stamp boolean NOT NULL DEFAULT false,
 ADD COLUMN IF NOT EXISTS print_ts timestamptz,
+ADD COLUMN IF NOT EXISTS from_units numeric,
 ADD COLUMN IF NOT EXISTS src_symbol text,
 ADD COLUMN IF NOT EXISTS src_trade_id bigint,
 ADD COLUMN IF NOT EXISTS src_side text;

@@ -32,9 +32,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^3.0.1",
     "@types/ws": "^8.18.1",
     "gray-matter": "^4.0.3",
     "next": "15.5.2",
+    "nodemailer": "^7.0.11",
     "pg": "^8.16.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

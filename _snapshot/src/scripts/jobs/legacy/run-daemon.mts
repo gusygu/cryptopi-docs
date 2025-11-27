@@ -11,7 +11,7 @@ async function tick() {
 }
 
 async function main() {
-  // eslint-disable-next-line no-constant-condition
+   
   while (true) {
     const t0 = Date.now();
     try { await tick(); }

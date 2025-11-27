@@ -1,4 +1,6 @@
 import { requireUserSession } from "@/app/(server)/auth/session";
+import { buildInternalUrl } from "@/lib/server/url";
+import { getSuspendedEmails, getExcludedEmails } from "@/lib/auth/suspension";
 
 type HealthPayload = {
   ok?: boolean;
@@ -58,10 +60,10 @@ export default async function AdminSystemPage() {
 
   try {
     const [healthRes, statusRes] = await Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/vitals/health`, {
+      fetch(buildInternalUrl("/api/vitals/health"), {
         cache: "no-store",
       }).catch(() => null),
-      fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/vitals/status`, {
+      fetch(buildInternalUrl("/api/vitals/status"), {
         cache: "no-store",
       }).catch(() => null),
     ]);
@@ -92,6 +94,8 @@ export default async function AdminSystemPage() {
   const level = status?.summary?.level ?? "unknown";
   const counts: StatusCounts = status?.summary?.counts ?? {};
   const statusTs = typeof status?.ts === "number" ? status.ts : undefined;
+  const suspendedEmails = getSuspendedEmails();
+  const excludedEmails = getExcludedEmails();
 
   return (
     <div className="space-y-4">
@@ -177,6 +181,48 @@ export default async function AdminSystemPage() {
               2
             )}
           </pre>
+        </div>
+
+        {/* Suspension guard */}
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-3">
+          <p className="text-xs text-zinc-400">Suspension guard</p>
+          <p className="mt-2 text-[11px] text-zinc-500">
+            Emails listed here get hard-blocked unless explicitly excluded.
+          </p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-semibold text-rose-200">
+                Suspended
+              </p>
+              {suspendedEmails.length === 0 ? (
+                <p className="text-[11px] text-zinc-500">—</p>
+              ) : (
+                <ul className="mt-1 space-y-1 text-[11px] text-zinc-300">
+                  {suspendedEmails.map((email) => (
+                    <li key={email} className="font-mono">
+                      {email}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-emerald-200">
+                Excluded
+              </p>
+              {excludedEmails.length === 0 ? (
+                <p className="text-[11px] text-zinc-500">—</p>
+              ) : (
+                <ul className="mt-1 space-y-1 text-[11px] text-zinc-300">
+                  {excludedEmails.map((email) => (
+                    <li key={email} className="font-mono">
+                      {email}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
       </section>
     </div>

@@ -21,7 +21,7 @@ function readEnv(): Env {
 
   if (!parsed.success) {
     // Print a friendly message and fail fast
-    // eslint-disable-next-line no-console
+     
     console.error('❌ Invalid environment:\n', parsed.error.flatten().fieldErrors);
     throw new Error('Invalid environment. Check your .env.local / deployment secrets.');
   }

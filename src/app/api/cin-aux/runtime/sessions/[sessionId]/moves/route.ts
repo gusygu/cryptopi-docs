@@ -28,6 +28,7 @@ export async function GET(
       p_bridge_in_usdt,
       p_bridge_out_usdt,
       lot_units_used,
+      from_units,
       trace_usdt,
       profit_consumed_usdt,
       principal_hit_usdt,
@@ -66,6 +67,7 @@ export async function GET(
     pBridgeInUsdt: r.p_bridge_in_usdt?.toString() ?? null,
     pBridgeOutUsdt: r.p_bridge_out_usdt?.toString() ?? null,
     lotUnitsUsed: r.lot_units_used?.toString() ?? null,
+    fromUnits: r.from_units?.toString() ?? null,
     traceUsdt: r.trace_usdt?.toString() ?? "0",
     profitConsumedUsdt: r.profit_consumed_usdt?.toString() ?? "0",
     principalHitUsdt: r.principal_hit_usdt?.toString() ?? "0",
@@ -74,7 +76,10 @@ export async function GET(
     notes: r.notes ?? null,
     pnlForMoveUsdt: r.pnl_for_move_usdt?.toString() ?? null,
     feeRate: r.fee_rate?.toString() ?? null,
-    effectivePriceFrom: null,
+    effectivePriceFrom:
+      r.from_units && Number(r.from_units) !== 0
+        ? (Number(r.executed_usdt ?? 0) / Number(r.from_units)).toString()
+        : null,
   }));
 
   return NextResponse.json(moves);

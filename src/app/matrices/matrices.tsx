@@ -363,8 +363,8 @@ function MoodAuxPanel({ snapshot, winners, losers, lastUpdated, totalRows }: Moo
 
       <section className="space-y-4">
         <div className="grid gap-3">
-          <MoodStat label="Avg id_pct" value={formatPercent(score, 2)} accent={accent} />
-          <MoodStat label="Spread width" value={formatPercent(amplitude, 2)} accent="#38bdf8" />
+          <MoodStat label="Avg id_pct" value={formatPercent(score, 7)} accent={accent} />
+          <MoodStat label="Spread width" value={formatPercent(amplitude, 7)} accent="#38bdf8" />
           <MoodStat
             label="Bias balance"
             value={
@@ -441,7 +441,7 @@ function MoodList({ title, entries, emptyCopy }: { title: string; entries: MoodE
                 boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
               }}
             >
-              {formatPercent(entry.value, 2)}
+              {formatPercent(entry.value, 7)}
             </span>
           </div>
         ))}
@@ -646,7 +646,7 @@ export default function MatricesClient() {
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Pairs tracked" value={rows.length} hint={`${coins.length} assets | quote ${quote}`} />
             <StatCard label="Benchmark stamp" value={formatTimestamp(benchmarkTs)} hint="UTC / local time" accent="#facc15" />
-            <StatCard label="Mood regime" value={mood.label} hint={formatPercent(mood.score, 2)} accent={mood.accent} />
+            <StatCard label="Mood regime" value={mood.label} hint={formatPercent(mood.score, 7)} accent={mood.accent} />
             <StatCard label="Status" value={statusLabel} accent={statusAccent} hint={error ?? undefined} />
           </div>
 

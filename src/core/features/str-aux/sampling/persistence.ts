@@ -6,7 +6,7 @@ type LoopsState = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __STR_AUX_PERSIST_LOOPS__:
     | { loops: LoopsState; started: boolean }
     | undefined;

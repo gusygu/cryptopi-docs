@@ -32,7 +32,8 @@ const ringClass = (r: Ring) =>
 : r === "purple"? "ring ring-purple"
 :                 "ring ring-grey";
 
-const fmtPct = (v: number | null) => (v == null || !Number.isFinite(v)) ? "—" : `${(v * 100).toFixed(2)}%`;
+const fmtPct = (v: number | null, decimals = 2) =>
+  v == null || !Number.isFinite(v) ? "-" : `${(v * 100).toFixed(decimals)}%`;
 const fmtNum = (v: number | null, digits = 6) => {
   if (v == null || !Number.isFinite(v)) return "—";
   const s = v.toFixed(digits);
@@ -90,28 +91,28 @@ export const MatricesTable: React.FC<Props> = ({ rows, pct24hValues }) => {
                 {/* pct_ref */}
                 <td className="px-3 py-2 font-mono tabular-nums text-[13px]">
                   <div className="cell" style={{ background: r.ref_block.top.color }}>
-                    {fmtPct(r.ref_block.top.value)}
+                    {fmtPct(r.ref_block.top.value, 7)}
                   </div>
                 </td>
 
                 {/* ref */}
                 <td className="px-3 py-2 font-mono tabular-nums text-[13px]">
                   <div className="cell" style={{ background: r.ref_block.bottom.color }}>
-                    {fmtPct(r.ref_block.bottom.value)}
+                    {fmtPct(r.ref_block.bottom.value, 7)}
                   </div>
                 </td>
 
                 {/* id_pct */}
                 <td className="px-3 py-2 font-mono tabular-nums text-[13px]">
                   <div className="cell" style={{ background: r.id_pct.color }}>
-                    {fmtPct(r.id_pct.value)}
+                    {fmtPct(r.id_pct.value, 7)}
                   </div>
                 </td>
 
                 {/* pct_drv */}
                 <td className="px-3 py-2 font-mono tabular-nums text-[13px]">
                   <div className="cell" style={{ background: r.pct_drv.color }}>
-                    {fmtPct(r.pct_drv.value)}
+                    {fmtPct(r.pct_drv.value, 7)}
                   </div>
                 </td>
 

@@ -131,7 +131,7 @@ class UniverseSampler {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __STR_AUX_SAMPLER_WATCHER__:
     | { watcher: UniverseSampler; started: boolean }
     | undefined;

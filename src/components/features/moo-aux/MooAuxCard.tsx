@@ -9,7 +9,7 @@ import React, {
   type ReactNode,
 } from "react";
 import Matrix, { type MatrixCell } from "@/components/features/matrices/Matrix";
-import { withAlpha } from "@/components/features/matrices/colors";
+import { withAlpha, COLOR_AMBER, NULL_SENSITIVITY } from "@/components/features/matrices/colors";
 
 const FALLBACK_COINS: string[] = ["BTC", "ETH", "BNB", "SOL", "ADA", "XRP", "PEPE", "USDT"];
 const CARD_GRADIENT =
@@ -379,8 +379,12 @@ function resolveNumeric(value: unknown): number | null {
 }
 
 function pickBackground(weight: number | null, maxAbs: number): string {
-  if (weight == null) return withAlpha("#1f2937", 0.45);
-  if (maxAbs <= 0) return withAlpha("#38bdf8", 0.22);
+  if (weight == null || Math.abs(weight) <= NULL_SENSITIVITY) {
+    return withAlpha(COLOR_AMBER, 0.85);
+  }
+  if (maxAbs <= NULL_SENSITIVITY) {
+    return withAlpha("#38bdf8", 0.22);
+  }
   const ratio = Math.min(1, Math.abs(weight) / maxAbs);
   const eased = Math.pow(ratio, 0.65);
   const base = weight >= 0 ? "#38bdf8" : "#f97316";

@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+ 
 const { Client } = require("pg");
 const url = process.env.DATABASE_URL;
 const schema = (process.env.DB_SCHEMA || "public").replace(/"/g, "");

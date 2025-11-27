@@ -1,5 +1,5 @@
 // src/scripts/smokes/str-aux-db-smoke.mts
-/* eslint-disable no-console */
+ 
 import { db, query } from "@/core/db/pool_server";
 
 function floorTo(ms: number, stepMs: number) {

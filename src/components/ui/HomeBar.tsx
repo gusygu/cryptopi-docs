@@ -44,16 +44,20 @@ const FEATURE_LINKS: NavLink[] = [
   { href: "/cin", label: "Cin-Aux" },
   { href: "/str-aux", label: "Str-Aux" },
   { href: "/settings", label: "Settings" },
+  { href: "/audit", label: "Audit" },
   { href: "/docs", label: "Docs" },
   { href: "/info", label: "Info" },
 ] as const;
 
 const DEV_LINKS: NavLink[] = [
   { href: "/admin", label: "Admin" },
+  { href: "/admin/audit", label: "Audit" },
+  { href: "/admin/actions", label: "Actions" },
+  { href: "/admin/jobs", label: "Jobs" },
+  { href: "/admin/ingest", label: "Ingest" },
   { href: "/admin/invites", label: "Invites" },
   { href: "/admin/users", label: "Users" },
-  { href: "/admin/jobs", label: "Jobs" },
-  { href: "/admin/actions", label: "Actions" },
+  { href: "/admin/system", label: "System" },
 ];
 
 const API_ENDPOINTS = [
@@ -408,122 +412,102 @@ export default function HomeBar({ className = "" }: { className?: string }) {
   const showDevNav = !!session?.isAdmin;
 
   return (
-    <div
-      className={`sticky top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur ${className}`}
-      role="banner"
+    <aside
+      className={`w-full border-b border-white/10 bg-black/60 text-xs text-zinc-100 backdrop-blur md:border-b-0 md:border-r md:bg-black/70 md:text-sm ${className}`}
+      role="complementary"
     >
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 px-4 py-3 text-xs text-zinc-100 sm:text-sm">
-        {/* Brand + navigation */}
-        <div className="flex flex-1 flex-wrap items-start gap-2">
-          <Link
-            href="/"
-            className="text-sm font-semibold tracking-tight text-emerald-200"
-          >
-            CryptoPi Dynamics
-          </Link>
-          <div className="flex flex-1 flex-col gap-1">
-            <nav
-              className="flex flex-wrap items-center gap-1"
-              aria-label="Primary"
-            >
-              {FEATURE_LINKS.map((item) => {
-                const active = isRouteActive(pathname, item.href);
-                const cls = active
-                  ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-100"
-                  : "border-zinc-700/50 bg-zinc-900/70 text-zinc-200 hover:border-emerald-400/40 hover:text-emerald-100";
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={`rounded-md border px-2.5 py-1 text-xs transition sm:text-sm ${cls}`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-            {showDevNav ? (
-              <nav
-                className="flex flex-wrap items-center gap-1 text-[11px]"
-                aria-label="Developer"
-              >
-                {DEV_LINKS.map((item) => {
-                  const active = isRouteActive(pathname, item.href);
-                  const cls = active
-                    ? "border-sky-500/60 bg-sky-600/20 text-sky-100"
-                    : "border-zinc-700/50 bg-zinc-900/60 text-zinc-200 hover:border-sky-500/40 hover:text-sky-100";
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={`rounded-md border px-2 py-1 transition ${cls}`}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </nav>
-            ) : null}
-          </div>
-          <div className="relative">
-            <label className="sr-only" htmlFor="homebar-api-select">
-              API quick navigation
-            </label>
-            <select
-              id="homebar-api-select"
-              className="rounded-md border border-zinc-700/60 bg-zinc-900/80 px-2 py-1 text-[11px] text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-0 sm:text-xs"
-              value={apiSelection}
-              onChange={(event) => {
-                const value = event.target.value;
-                setApiSelection("");
-                if (value) handleApiRedirect(value);
-              }}
-            >
-              <option value="">API endpoints…</option>
-              {API_ENDPOINTS.map((api) => (
-                <option key={api.href} value={api.href}>
-                  {api.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Session pill / Sign-in */}
-        <div className="ml-2 flex items-center">
-          {session?.email ? (
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full border border-zinc-600/60 bg-zinc-900/70 px-2 py-0.5 text-[10px] text-zinc-100 sm:text-xs">
-                {session.nickname || session.email}
-                {session.isAdmin ? (
-                  <span className="ml-1 rounded-full bg-emerald-600/30 px-1.5 text-[9px] uppercase tracking-wide text-emerald-100">
-                    admin
-                  </span>
-                ) : null}
-              </span>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="rounded-md border border-zinc-600/60 bg-zinc-900/70 px-2 py-0.5 text-[10px] text-zinc-300 transition hover:border-rose-500/60 hover:bg-rose-600/20 hover:text-rose-100 sm:text-xs"
-              >
-                Sign out
-              </button>
-            </div>
-          ) : (
+      <div className="flex h-full flex-col gap-6 overflow-y-auto px-4 py-5 md:px-5 md:py-6">
+        <div className="space-y-3">
+          <div>
             <Link
-              href="/auth"
-              className="text-[11px] text-zinc-300 underline-offset-2 hover:text-emerald-200 hover:underline sm:text-xs"
+              href="/"
+              className="text-base font-semibold tracking-tight text-emerald-200"
             >
-              Sign in
+              CryptoPi Dynamics
             </Link>
-          )}
+            <p className="mt-0.5 text-[11px] text-zinc-500">
+              Matrices, aux controls, and vitals.
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-3">
+            {session?.email ? (
+              <div className="space-y-3">
+                <div>
+                  <div className="text-sm font-semibold text-zinc-100">
+                    {session.nickname || session.email}
+                  </div>
+                  <p className="text-[11px] text-zinc-500">Signed in</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  {session.isAdmin ? (
+                    <span className="rounded-full bg-emerald-600/30 px-2 py-[2px] text-[10px] uppercase tracking-wide text-emerald-100">
+                      admin
+                    </span>
+                  ) : (
+                    <span className="text-[10px] uppercase tracking-wide text-zinc-500">
+                      member
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="rounded-md border border-zinc-700/60 px-3 py-1 text-[11px] text-zinc-200 transition hover:border-rose-500/60 hover:bg-rose-600/20 hover:text-rose-100"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 text-[11px]">
+                <p className="text-zinc-400">Sign in to sync cycles and audit logs.</p>
+                <Link
+                  href="/auth"
+                  className="inline-flex items-center justify-center rounded-md border border-emerald-500/40 px-3 py-1 text-sm text-emerald-200 transition hover:border-emerald-400 hover:text-emerald-100"
+                >
+                  Sign in
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Poller controls */}
-        <div className="flex flex-none items-center gap-2 rounded-lg border border-white/10 bg-zinc-950/70 px-3 py-2">
-          <div className="flex items-center gap-2">
+        <section className="rounded-xl border border-white/10 bg-zinc-950/70 p-4 text-[11px] shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+          <div className="flex items-center justify-between gap-3 text-[11px] uppercase tracking-wide text-zinc-500">
+            <span>Metronome</span>
+            <span className="font-mono text-sm text-emerald-200">
+              {countdownSec != null ? formatCountdown(countdownSec) : "Paused"}
+              <span className="ml-1 text-[10px] text-zinc-500">
+                / {formatCountdown(settingsCycle)}
+              </span>
+            </span>
+          </div>
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-zinc-400">
+            <span>Cycle {romanPhase(phase)}</span>
+            <span>&middot;</span>
+            <span>Loop {loopNumber}</span>
+            {pulse ? (
+              <span
+                className={`ml-auto inline-flex h-3 w-3 items-center justify-center rounded-full transition ${
+                  pulse.mode === "double"
+                    ? "bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.65)]"
+                    : "bg-emerald-500/80"
+                }`}
+                aria-label={pulse.mode === "double" ? "Loop tick" : "Cycle tick"}
+              />
+            ) : (
+              <span
+                className="ml-auto inline-flex h-3 w-3 rounded-full bg-zinc-700/80"
+                aria-hidden
+              />
+            )}
+          </div>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-zinc-900/70">
+            <div
+              className="h-full rounded-full bg-emerald-400 transition-[width]"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
             <button
               type="button"
               onClick={() => {
@@ -531,18 +515,18 @@ export default function HomeBar({ className = "" }: { className?: string }) {
                 setAutoOn(next);
                 setEnabled(next);
               }}
-              className={`rounded-md border px-2 py-1 text-[11px] font-medium transition sm:text-xs ${
+              className={`rounded-md border px-3 py-1 font-medium transition ${
                 autoOn
                   ? "border-emerald-500/50 bg-emerald-600/30 text-emerald-50 hover:bg-emerald-600/45"
                   : "border-zinc-600/60 bg-zinc-800/70 text-zinc-200 hover:bg-zinc-700/70"
               }`}
             >
-              Auto&nbsp;{autoOn ? "ON" : "OFF"}
+              Auto {autoOn ? "ON" : "OFF"}
             </button>
             <button
               type="button"
               onClick={() => requestRefresh()}
-              className="rounded-md border border-sky-500/50 bg-sky-600/30 px-2 py-1 text-[11px] text-sky-50 transition hover:bg-sky-500/45 sm:text-xs"
+              className="rounded-md border border-sky-500/50 bg-sky-600/30 px-3 py-1 font-medium text-sky-50 transition hover:bg-sky-500/45"
             >
               Refresh
             </button>
@@ -553,66 +537,27 @@ export default function HomeBar({ className = "" }: { className?: string }) {
                 setMetMuteState(next);
                 setMuted(next);
               }}
-              className={`rounded-md border px-2 py-1 text-[11px] transition sm:text-xs ${
+              className={`col-span-2 rounded-md border px-3 py-1 font-medium transition ${
                 !metMute
                   ? "border-emerald-500/50 bg-emerald-600/30 text-emerald-50 hover:bg-emerald-600/45"
                   : "border-zinc-600/60 bg-zinc-800/70 text-zinc-200 hover:bg-zinc-700/70"
               }`}
             >
-              Metronome&nbsp;{metMute ? "OFF" : "ON"}
+              Metronome {metMute ? "OFF" : "ON"}
             </button>
           </div>
-          <div
-            className="hidden h-8 w-px bg-zinc-700/60 sm:block"
-            aria-hidden
-          />
-          <div className="flex flex-col text-[11px] leading-tight sm:text-xs">
-            <div className="flex items-center gap-1 font-mono uppercase tracking-wide text-emerald-200/80">
-              <span>
-                {countdownSec != null
-                  ? formatCountdown(countdownSec)
-                  : "Paused"}
-              </span>
-              <span className="text-[10px] text-zinc-400">
-                / {formatCountdown(settingsCycle)}
-              </span>
-            </div>
-            <div className="flex items-center gap-1 text-[10px] text-zinc-400 sm:text-[11px]">
-              <span>Cycle {romanPhase(phase)}</span>
-              <span>&middot;</span>
-              <span>Loop {loopNumber}</span>
-              {pulse ? (
-                <span
-                  className={`inline-flex h-2.5 w-2.5 items-center justify-center rounded-full transition ${
-                    pulse.mode === "double"
-                      ? "bg-emerald-400 shadow-[0_0_6px_1px_rgba(16,185,129,0.55)]"
-                      : "bg-emerald-500/80"
-                  }`}
-                  aria-label={
-                    pulse.mode === "double" ? "Loop tick" : "Cycle tick"
-                  }
-                />
-              ) : (
-                <span
-                  className="inline-flex h-2.5 w-2.5 rounded-full bg-zinc-700/80"
-                  aria-hidden
-                />
-              )}
-            </div>
-            <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-zinc-800/80">
-              <div
-                className="h-full bg-emerald-400 transition-[width]"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-          </div>
-        </div>
+        </section>
 
-        {/* Status / vitals */}
-        <div className="flex min-w-[220px] flex-none flex-col gap-1 rounded-lg border border-white/10 bg-zinc-950/70 px-3 py-2 text-[11px] sm:text-xs">
-          <div className="flex items-center justify-between gap-2">
-            <span
-              className={`inline-flex items-center gap-1 rounded-md border px-2 py-[2px] font-medium ${badgeTone(
+        <section className="rounded-xl border border-white/10 bg-zinc-950/70 p-4 text-[11px]">
+          <div className="flex items-baseline justify-between text-[11px] uppercase tracking-wide text-zinc-500">
+            <span>Vitals</span>
+            <span className="text-[10px] normal-case text-zinc-400">
+              Updated {formatSince(vitals.healthTs ?? vitals.statusTs)}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2">
+            <div
+              className={`flex items-center justify-between rounded-lg border px-3 py-2 font-medium ${badgeTone(
                 vitals.healthOk == null
                   ? "muted"
                   : vitals.healthOk
@@ -624,14 +569,14 @@ export default function HomeBar({ className = "" }: { className?: string }) {
               <span className="font-mono uppercase">
                 {vitals.healthDb ??
                   (vitals.healthOk == null
-                    ? "—"
+                    ? "-"
                     : vitals.healthOk
                     ? "up"
                     : "down")}
               </span>
-            </span>
-            <span
-              className={`inline-flex items-center gap-1 rounded-md border px-2 py-[2px] font-medium ${badgeTone(
+            </div>
+            <div
+              className={`flex items-center justify-between rounded-lg border px-3 py-2 font-medium ${badgeTone(
                 vitals.statusLevel ?? (vitals.loading ? "neutral" : "muted")
               )}`}
             >
@@ -641,30 +586,101 @@ export default function HomeBar({ className = "" }: { className?: string }) {
                   ? levelToLabel(vitals.statusLevel)
                   : vitals.loading
                   ? "loading"
-                  : "—"}
+                  : "-"}
               </span>
-            </span>
+            </div>
           </div>
-          <div className="flex items-center justify-between text-[10px] text-zinc-400 sm:text-[11px]">
-            <span>Updated {formatSince(vitals.healthTs ?? vitals.statusTs)}</span>
+          <div className="mt-2 text-[10px] text-zinc-400">
             {vitals.statusCounts ? (
               <span>
-                ok {vitals.statusCounts.ok} · warn {vitals.statusCounts.warn} ·
-                err {vitals.statusCounts.err}
+                ok {vitals.statusCounts.ok} &middot; warn {vitals.statusCounts.warn} &middot; err {vitals.statusCounts.err}
               </span>
             ) : (
-              <span>
-                {vitals.loading ? "Fetching…" : vitals.error ? "Error" : "—"}
-              </span>
+              <span>{vitals.loading ? "Fetching." : vitals.error ? "Error" : "-"}</span>
             )}
           </div>
           {vitals.error ? (
-            <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[10px] text-rose-100">
+            <div className="mt-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[10px] text-rose-100">
               {vitals.error}
             </div>
           ) : null}
+        </section>
+
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-zinc-500">Workspace</p>
+          <nav className="mt-3 space-y-1" aria-label="Primary">
+            {FEATURE_LINKS.map((item) => {
+              const active = isRouteActive(pathname, item.href);
+              const cls = active
+                ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-100 shadow-[0_0_14px_rgba(16,185,129,0.25)]"
+                : "border-zinc-800/80 bg-black/30 text-zinc-300 hover:border-emerald-400/40 hover:text-emerald-100";
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition ${cls}`}
+                >
+                  <span>{item.label}</span>
+                  {active ? <span className="text-[10px] uppercase text-emerald-300">now</span> : null}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        {showDevNav ? (
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Admin tools</p>
+            <nav className="mt-3 space-y-1" aria-label="Developer">
+              {DEV_LINKS.map((item) => {
+                const active = isRouteActive(pathname, item.href);
+                const cls = active
+                  ? "border-sky-500/60 bg-sky-600/20 text-sky-100 shadow-[0_0_14px_rgba(56,189,248,0.25)]"
+                  : "border-zinc-800/80 bg-black/30 text-zinc-300 hover:border-sky-500/40 hover:text-sky-100";
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition ${cls}`}
+                  >
+                    <span>{item.label}</span>
+                    {active ? <span className="text-[10px] uppercase text-sky-200">now</span> : null}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        ) : null}
+
+        <div className="mt-auto space-y-2 border-t border-white/5 pt-4">
+          <label
+            className="text-[11px] uppercase tracking-wide text-zinc-500"
+            htmlFor="homebar-api-select"
+          >
+            API quick links
+          </label>
+          <select
+            id="homebar-api-select"
+            className="w-full rounded-md border border-zinc-700/60 bg-zinc-900/80 px-3 py-2 text-[11px] text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-0"
+            value={apiSelection}
+            onChange={(event) => {
+              const value = event.target.value;
+              setApiSelection("");
+              if (value) handleApiRedirect(value);
+            }}
+          >
+            <option value="">Select endpoint</option>
+            {API_ENDPOINTS.map((api) => (
+              <option key={api.href} value={api.href}>
+                {api.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
-    </div>
+    </aside>
+
   );
 }

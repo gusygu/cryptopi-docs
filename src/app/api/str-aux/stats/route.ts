@@ -1,5 +1,6 @@
 // src/app/api/str-aux/stats/route.ts
 import { NextResponse } from 'next/server';
+import { requireUserSession } from '@/app/(server)/auth/session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -83,6 +84,7 @@ const updateStreamScalar = (row: StreamScalar | undefined, next: number | null):
 };
 
 export async function GET(req: Request) {
+  await requireUserSession();
   try {
     const url = new URL(req.url);
     const selection = await resolveSymbolSelection(url);

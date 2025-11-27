@@ -1,11 +1,11 @@
 import { requireUserSession } from "@/app/(server)/auth/session";
+import { buildInternalUrl } from "@/lib/server/url";
 
 async function fetchJson(path: string) {
   try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL ?? ""}${path}`,
-      { cache: "no-store" }
-    );
+    const res = await fetch(buildInternalUrl(path), {
+      cache: "no-store",
+    });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -17,14 +17,17 @@ export default async function AdminIngestPage() {
   const session = await requireUserSession();
   if (!session.isAdmin) return null;
 
-  const [strAuxStats, matricesLatest, mooAux] = await Promise.all([
+  const [strAuxStats, matricesLatest, mooAux, cinSessions] = await Promise.all([
     fetchJson("/api/str-aux/stats"),
     fetchJson("/api/matrices/latest"),
     fetchJson("/api/moo-aux"),
+    fetchJson("/api/cin-aux/runtime/sessions"),
   ]);
 
   const matricesTs = (matricesLatest as any)?.ts ?? (matricesLatest as any)?.timestamp;
   const mooTs = (mooAux as any)?.ts ?? (mooAux as any)?.timestamp;
+  const cinList = Array.isArray(cinSessions) ? cinSessions : [];
+  const latestCin = cinList[0] ?? null;
 
   const now = Date.now();
 
@@ -46,7 +49,7 @@ export default async function AdminIngestPage() {
         </p>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* STR-aux */}
         <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-3 text-xs">
           <p className="text-xs font-semibold text-zinc-300">STR-aux</p>
@@ -90,6 +93,30 @@ export default async function AdminIngestPage() {
           </p>
           <pre className="mt-2 max-h-40 overflow-auto rounded-md bg-black/60 p-2 text-[10px] text-zinc-300">
             {JSON.stringify(mooAux ?? { error: "no-data" }, null, 2)}
+          </pre>
+        </div>
+
+        {/* Cin-aux */}
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-3 text-xs">
+          <p className="text-xs font-semibold text-zinc-300">Cin-aux runtime</p>
+          <p className="mt-1 text-[11px] text-zinc-400">
+            Latest stats from{" "}
+            <span className="font-mono">/api/cin-aux/runtime/sessions</span>
+          </p>
+          <p className="mt-2 text-[11px] text-zinc-400">
+            Active sessions:{" "}
+            <span className="font-mono text-emerald-200">{cinList.length}</span>
+          </p>
+          <p className="mt-1 text-[11px] text-zinc-400">
+            Latest started:{" "}
+            <span className="font-mono text-zinc-200">
+              {latestCin?.started_at
+                ? new Date(latestCin.started_at).toLocaleString()
+                : "—"}
+            </span>
+          </p>
+          <pre className="mt-2 max-h-40 overflow-auto rounded-md bg-black/60 p-2 text-[10px] text-zinc-300">
+            {JSON.stringify(cinList.slice(0, 3) ?? { error: "no-data" }, null, 2)}
           </pre>
         </div>
       </section>

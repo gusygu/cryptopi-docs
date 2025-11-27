@@ -1,6 +1,7 @@
+import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { sql } from "@/core/db/db";
 import { requireUserSession } from "@/app/(server)/auth/session";
-import { revalidatePath } from "next/cache";
 import { logAdminAction } from "@/app/(server)/admin/log";
 
 async function setUserAdmin(formData: FormData) {
@@ -9,21 +10,35 @@ async function setUserAdmin(formData: FormData) {
   const session = await requireUserSession();
   if (!session.isAdmin) return;
 
-  const userId = (formData.get("user_id") ?? "").toString();
+  const userIdRaw = (formData.get("user_id") ?? "").toString().trim();
+  const emailRaw = (formData.get("email") ?? "").toString().trim().toLowerCase();
   const makeAdmin = (formData.get("make_admin") ?? "").toString() === "true";
-  if (!userId) return;
+  if (!emailRaw) return;
 
-  await sql`
-    UPDATE auth.user_account
-    SET is_admin = ${makeAdmin}
-    WHERE user_id = ${userId}
-  `;
+  if (!makeAdmin && session.email.toLowerCase() === emailRaw) {
+    // prevent removing your own admin flag
+    return;
+  }
+
+  await sql.begin(async (tx: any) => {
+    await tx`
+      UPDATE auth."user"
+      SET is_admin = ${makeAdmin}
+      WHERE lower(email) = ${emailRaw}
+    `;
+    await tx`
+      UPDATE auth.user_account
+      SET is_admin = ${makeAdmin}, updated_at = now()
+      WHERE lower(email) = ${emailRaw}
+    `;
+  });
 
   await logAdminAction({
     actionType: "user.set_admin",
     actionScope: "users",
-    targetUserId: userId,
-    message: `${session.email} set is_admin=${makeAdmin} on user ${userId}`,
+    targetUserId: userIdRaw || null,
+    targetEmail: emailRaw,
+    message: `${session.email} set is_admin=${makeAdmin} on ${emailRaw}`,
   });
 
   revalidatePath("/admin/users");
@@ -35,22 +50,36 @@ async function setUserStatus(formData: FormData) {
   const session = await requireUserSession();
   if (!session.isAdmin) return;
 
-  const userId = (formData.get("user_id") ?? "").toString();
+  const userIdRaw = (formData.get("user_id") ?? "").toString().trim();
+  const emailRaw = (formData.get("email") ?? "").toString().trim().toLowerCase();
   const newStatus = (formData.get("status") ?? "").toString();
-  if (!userId) return;
+  if (!emailRaw) return;
   if (!["active", "suspended", "invited"].includes(newStatus)) return;
 
-  await sql`
-    UPDATE auth.user_account
-    SET status = ${newStatus}
-    WHERE user_id = ${userId}
-  `;
+  if (session.email.toLowerCase() === emailRaw && newStatus !== "active") {
+    // do not allow suspending yourself from the admin UI
+    return;
+  }
+
+  await sql.begin(async (tx: any) => {
+    await tx`
+      UPDATE auth."user"
+      SET status = ${newStatus === "invited" ? "pending" : newStatus}
+      WHERE lower(email) = ${emailRaw}
+    `;
+    await tx`
+      UPDATE auth.user_account
+      SET status = ${newStatus}, updated_at = now()
+      WHERE lower(email) = ${emailRaw}
+    `;
+  });
 
   await logAdminAction({
     actionType: "user.set_status",
     actionScope: "users",
-    targetUserId: userId,
-    message: `${session.email} set status=${newStatus} on user ${userId}`,
+    targetUserId: userIdRaw || null,
+    targetEmail: emailRaw,
+    message: `${session.email} set status=${newStatus} on ${emailRaw}`,
   });
 
   revalidatePath("/admin/users");
@@ -65,15 +94,48 @@ export default async function AdminUsersPage() {
   }
 
   const rows = await sql`
-    SELECT
-      user_id,
-      email,
-      nickname,
-      is_admin,
-      status,
-      created_at,
-      last_login_at
-    FROM auth.user_account
+    WITH auth_users AS (
+      SELECT
+        u.user_id,
+        u.email,
+        COALESCE(ua.nickname, u.nickname) AS nickname,
+        COALESCE(ua.is_admin, u.is_admin) AS is_admin,
+        COALESCE(
+          ua.status::text,
+          CASE WHEN u.status = 'pending' THEN 'invited' ELSE u.status END
+        ) AS status,
+        u.created_at,
+        u.last_login_at,
+        ua.user_id AS account_user_id,
+        'auth_user'::text AS source
+      FROM auth."user" u
+      LEFT JOIN auth.user_account ua
+        ON lower(ua.email) = lower(u.email)
+    ),
+    account_only AS (
+      SELECT
+        ua.user_id,
+        ua.email,
+        ua.nickname,
+        ua.is_admin,
+        ua.status::text AS status,
+        ua.created_at,
+        ua.last_login_at,
+        ua.user_id AS account_user_id,
+        'user_account_only'::text AS source
+      FROM auth.user_account ua
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM auth."user" u
+        WHERE lower(u.email) = lower(ua.email)
+      )
+    )
+    SELECT *
+    FROM (
+      SELECT * FROM auth_users
+      UNION ALL
+      SELECT * FROM account_only
+    ) combined
     ORDER BY created_at DESC
     LIMIT 200
   `;
@@ -86,6 +148,8 @@ export default async function AdminUsersPage() {
     status: "active" | "suspended" | "invited";
     created_at: string;
     last_login_at: string | null;
+    account_user_id: string | null;
+    source: "auth_user" | "user_account_only";
   }>;
 
   return (
@@ -128,16 +192,34 @@ export default async function AdminUsersPage() {
                 ? new Date(u.last_login_at)
                 : null;
 
-              const canDemoteSelf =
+              const isSelf =
                 session.email.toLowerCase() === u.email.toLowerCase();
+              const nextStatus =
+                u.status === "suspended" || u.status === "invited"
+                  ? "active"
+                  : "suspended";
+              const statusActionLabel =
+                nextStatus === "active" ? "Activate" : "Suspend";
+              const statusActionDisabled =
+                isSelf && nextStatus !== "active";
 
               return (
                 <tr key={u.user_id} className="border-t border-zinc-800">
                   <td className="px-3 py-2 font-mono text-[11px]">
-                    {u.email}
+                    <Link
+                      href={`/admin/users/${u.user_id}`}
+                      className="text-emerald-200 underline-offset-2 hover:underline"
+                    >
+                      {u.email}
+                    </Link>
+                    {u.source === "user_account_only" ? (
+                      <p className="text-[10px] lowercase text-zinc-500">
+                        invite record (no login yet)
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2 text-[11px]">
-                    {u.nickname || <span className="text-zinc-500">—</span>}
+                    {u.nickname || <span className="text-zinc-500">-</span>}
                   </td>
                   <td className="px-3 py-2 text-[11px]">
                     <span
@@ -176,6 +258,7 @@ export default async function AdminUsersPage() {
                       {/* Admin toggle */}
                       <form action={setUserAdmin}>
                         <input type="hidden" name="user_id" value={u.user_id} />
+                        <input type="hidden" name="email" value={u.email} />
                         <input
                           type="hidden"
                           name="make_admin"
@@ -183,11 +266,12 @@ export default async function AdminUsersPage() {
                         />
                         <button
                           type="submit"
-                          className={`rounded-md border px-2 py-[2px] text-[10px] ${
+                          disabled={isSelf && u.is_admin}
+                          className={`rounded-md border px-2 py-[2px] text-[10px] disabled:cursor-not-allowed disabled:opacity-60 ${
                             u.is_admin
                               ? "border-amber-500/60 bg-amber-600/15 text-amber-100 hover:bg-amber-600/25"
                               : "border-emerald-500/60 bg-emerald-600/20 text-emerald-100 hover:bg-emerald-600/30"
-                          }`}
+                            }`}
                         >
                           {u.is_admin ? "Remove admin" : "Make admin"}
                         </button>
@@ -196,20 +280,22 @@ export default async function AdminUsersPage() {
                       {/* Status toggle: active <-> suspended */}
                       <form action={setUserStatus}>
                         <input type="hidden" name="user_id" value={u.user_id} />
+                        <input type="hidden" name="email" value={u.email} />
                         <input
                           type="hidden"
                           name="status"
-                          value={u.status === "suspended" ? "active" : "suspended"}
+                          value={nextStatus}
                         />
                         <button
                           type="submit"
-                          className={`rounded-md border px-2 py-[2px] text-[10px] ${
-                            u.status === "suspended"
+                          disabled={statusActionDisabled}
+                          className={`rounded-md border px-2 py-[2px] text-[10px] disabled:cursor-not-allowed disabled:opacity-60 ${
+                            nextStatus === "active"
                               ? "border-emerald-500/60 bg-emerald-600/20 text-emerald-100 hover:bg-emerald-600/30"
                               : "border-rose-500/60 bg-rose-600/15 text-rose-100 hover:bg-rose-600/25"
-                          }`}
+                            }`}
                         >
-                          {u.status === "suspended" ? "Activate" : "Suspend"}
+                          {statusActionLabel}
                         </button>
                       </form>
                     </div>

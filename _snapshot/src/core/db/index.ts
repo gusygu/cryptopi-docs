@@ -33,7 +33,7 @@ const poolConfig = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __core_pg_pool__: Pool | undefined;
 }
 

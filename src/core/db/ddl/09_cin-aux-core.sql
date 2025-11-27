@@ -10,6 +10,7 @@ CREATE SCHEMA IF NOT EXISTS cin_aux;
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS cin_aux.sessions (
   session_id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_user_id   uuid NOT NULL REFERENCES auth."user"(user_id),
   -- Store window as text; optional FK added later via guarded block
   window_label    text NOT NULL,
   window_bins     int    NOT NULL CHECK (window_bins > 0),
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS cin_aux.sessions (
 
   -- stamps
   engine_cycle          int,
+  cycle_index           bigint NOT NULL DEFAULT 0,
   opening_stamp         boolean NOT NULL DEFAULT false,
   opening_session_id    uuid,
   opening_ts            timestamptz,
@@ -32,11 +34,30 @@ CREATE TABLE IF NOT EXISTS cin_aux.sessions (
   print_ts              timestamptz
 );
 
--- Helpful indexes
-CREATE INDEX IF NOT EXISTS cin_sessions_ts_idx
-  ON cin_aux.sessions (created_at DESC);
 CREATE INDEX IF NOT EXISTS cin_sessions_window_idx
   ON cin_aux.sessions (window_label);
+
+-- Backward compatible column adds
+ALTER TABLE cin_aux.sessions
+  ADD COLUMN IF NOT EXISTS owner_user_id uuid REFERENCES auth."user"(user_id);
+ALTER TABLE cin_aux.sessions
+  ADD COLUMN IF NOT EXISTS cycle_index bigint NOT NULL DEFAULT 0;
+DO $$
+BEGIN
+  BEGIN
+    ALTER TABLE cin_aux.sessions
+      ALTER COLUMN owner_user_id SET NOT NULL;
+  EXCEPTION
+    WHEN others THEN
+      -- existing rows without owner can be backfilled later; skip constraint
+      NULL;
+  END;
+END$$;
+
+-- Helpful indexes that require new columns
+CREATE INDEX IF NOT EXISTS cin_sessions_ts_idx
+  ON cin_aux.sessions (owner_user_id, created_at DESC);
+
 
 -- Touch trigger for updated_at (local to cin_aux)
 CREATE OR REPLACE FUNCTION cin_aux.touch_updated_at()

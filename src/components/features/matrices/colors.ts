@@ -1,28 +1,52 @@
 export const COLOR_POSITIVE_SHADES = [
-  "#bbf7d0",
-  "#86efac",
-  "#4ade80",
-  "#22c55e",
-  "#16a34a",
-  "#15803d",
-  "#166534",
-  "#14532d",
+  "#eef47a",
+  "#c9ef52",
+  "#97df3b",
+  "#61c433",
+  "#35a028",
+  "#1e7a22",
+  "#11551b",
+  "#053116",
 ];
 
 export const COLOR_NEGATIVE_SHADES = [
-  "#fecaca",
-  "#fca5a5",
-  "#f87171",
-  "#ef4444",
-  "#dc2626",
-  "#b91c1c",
-  "#991b1b",
-  "#7f1d1d",
+  "#ffb7a7",
+  "#ff8f79",
+  "#ff664f",
+  "#f83d35",
+  "#d3202b",
+  "#a91825",
+  "#7a1420",
+  "#4a0d16",
 ];
 
-export const COLOR_AMBER = "#facc15";
+export const COLOR_MOO_POSITIVE_SHADES = [
+  "#c5dcff",
+  "#9fcbff",
+  "#6eaeff",
+  "#3c8eff",
+  "#1f6fe0",
+  "#1553b4",
+  "#0c377c",
+  "#062047",
+];
+
+export const COLOR_MOO_NEGATIVE_SHADES = [
+  "#ffd7b0",
+  "#ffb57c",
+  "#ff8f4c",
+  "#ff6626",
+  "#f2470c",
+  "#c93608",
+  "#992405",
+  "#661703",
+];
+
+export const COLOR_AMBER = "#f7b733";
 export const COLOR_MUTED = "rgba(148, 163, 184, 0.28)";
 export const COLOR_FROZEN = "#a855f7";
+
+export const NULL_SENSITIVITY = 1e-8;
 
 export type FrozenStage = "recent" | "mid" | "long";
 

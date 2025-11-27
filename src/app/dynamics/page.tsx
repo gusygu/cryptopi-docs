@@ -716,6 +716,7 @@ function mapArbRows(snapshot: DynamicsSnapshot | null, allowedCoins?: Set<string
             allowedSymbols={allowedSymbolSet}
             onSelectCandidate={handleSelectCandidate}
             onSelectPair={handleSelectMatrixCell}
+            className="min-w-0"
           />
 
           <ArbTable
@@ -726,10 +727,11 @@ function mapArbRows(snapshot: DynamicsSnapshot | null, allowedCoins?: Set<string
             refreshing={loading && !!arbRows.length}
             onRefresh={refresh}
             onSelectRow={handleSelectCandidate}
+            className="min-w-0"
           />
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] xl:grid-cols-[1.35fr_0.95fr]">
+        <section className="grid gap-6 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,0.3fr)] xl:grid-cols-[minmax(0,0.72fr)_minmax(0,0.28fr)]">
           <DynamicsMatrix
             coins={matrixCoins}
             mea={matrixMea}
@@ -743,9 +745,10 @@ function mapArbRows(snapshot: DynamicsSnapshot | null, allowedCoins?: Set<string
             lastUpdated={matrixTimestamp}
             loading={matrixLoading}
             onSelect={handleSelectMatrixCell}
+            className="min-w-0"
           />
 
-          <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-4">
             {matrixError ? (
               <div className="rounded-3xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
                 {matrixError}
@@ -761,6 +764,7 @@ function mapArbRows(snapshot: DynamicsSnapshot | null, allowedCoins?: Set<string
               benchmarkGrid={snapshot?.matrix?.benchmark}
               lastUpdated={snapshot?.builtAt ?? matrixTimestamp}
               loading={loading || availability.loading}
+              className="min-w-0"
             />
           </div>
         </section>
@@ -792,8 +796,6 @@ function mapArbRows(snapshot: DynamicsSnapshot | null, allowedCoins?: Set<string
     </div>
   );
 }
-
-
 
 
 

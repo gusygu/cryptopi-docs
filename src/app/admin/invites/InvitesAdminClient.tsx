@@ -68,7 +68,7 @@ export default function InvitesAdminClient() {
 
   useEffect(() => {
     loadInvites(filter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [filter]);
 
   async function handleApprove(requestId: string) {
@@ -92,7 +92,7 @@ export default function InvitesAdminClient() {
       // reload list after approve
       await loadInvites(filter);
       setActionState({ status: "idle" });
-      // token is in data.invite.token — you can later show it / copy it if you want
+      // token is returned as data.issued_token - you can later show it / copy it if you want
     } catch (err) {
       setActionState({ status: "error", error: "network_error" });
     }

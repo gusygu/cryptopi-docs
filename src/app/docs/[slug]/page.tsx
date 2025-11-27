@@ -84,7 +84,7 @@ export default async function DocPage({ params }: { params: Params }) {
 
       {/* Right: markdown-rendered doc */}
       <article className="prose prose-invert max-w-none flex-1 rounded-xl border border-white/10 bg-neutral-900/60 p-5 prose-pre:bg-black/50 prose-code:text-emerald-300 prose-a:text-emerald-300">
-        {/* eslint-disable-next-line react/no-danger */}
+        { }
         <div dangerouslySetInnerHTML={{ __html: html }} />
       </article>
     </div>

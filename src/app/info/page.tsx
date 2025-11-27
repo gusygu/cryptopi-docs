@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+ 
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 

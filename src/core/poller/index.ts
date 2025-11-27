@@ -102,7 +102,7 @@ type LivePoller = {
   stamp: string;   // JSON string of last settings snapshot
 };
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __server_poller__: LivePoller | undefined;
 }
 

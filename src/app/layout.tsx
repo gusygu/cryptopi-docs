@@ -21,9 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={num.variable}>
       <body className="antialiased bg-carbon-950 text-slate-100">
-        <div className="flex min-h-dvh flex-col">
-          <HomeBar />
-          <main className="flex-1">{children}</main>
+        <div className="flex min-h-dvh flex-col md:flex-row">
+          <HomeBar className="md:w-72 md:flex-shrink-0" />
+          <main className="flex-1 w-full">{children}</main>
         </div>
       </body>
     </html>

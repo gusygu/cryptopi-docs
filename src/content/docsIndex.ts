@@ -353,6 +353,15 @@ export const DOCS: DocMeta[] = [
     order: 10,
   },
   {
+    id: "client-calculations",
+    slug: "client-calculations",
+    title: "Client Calculations",
+    file: "G-Client_UX_Feature_Semantics/CALCULATIONS.md",
+    category: "client-ux-feature",
+    short: "Single reference for every UI formula and threshold.",
+    order: 15,
+  },
+  {
     id: "matrices-semantics",
     slug: "matrices-semantics",
     title: "Matrices Semantics",

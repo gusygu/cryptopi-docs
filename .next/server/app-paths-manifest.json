@@ -1,18 +1,14 @@
 {
-  "/api/vitals/health/route": "app/api/vitals/health/route.js",
-  "/api/vitals/status/route": "app/api/vitals/status/route.js",
-  "/icon/route": "app/icon/route.js",
+  "/api/moo-aux/route": "app/api/moo-aux/route.js",
+  "/api/matrices/latest/route": "app/api/matrices/latest/route.js",
+  "/api/preview/universe/symbols/route": "app/api/preview/universe/symbols/route.js",
   "/api/settings/route": "app/api/settings/route.js",
   "/api/auth/session/route": "app/api/auth/session/route.js",
-  "/api/cin-aux/runtime/sessions/route": "app/api/cin-aux/runtime/sessions/route.js",
-  "/api/cin-aux/runtime/sessions/[sessionId]/balances/route": "app/api/cin-aux/runtime/sessions/[sessionId]/balances/route.js",
-  "/api/cin-aux/runtime/sessions/[sessionId]/moves/route": "app/api/cin-aux/runtime/sessions/[sessionId]/moves/route.js",
-  "/api/cin-aux/runtime/sessions/[sessionId]/trades/sync/route": "app/api/cin-aux/runtime/sessions/[sessionId]/trades/sync/route.js",
-  "/api/cin-aux/runtime/sessions/[sessionId]/wallet/ingest/route": "app/api/cin-aux/runtime/sessions/[sessionId]/wallet/ingest/route.js",
-  "/api/cin-aux/runtime/sessions/[sessionId]/wallet/refresh/route": "app/api/cin-aux/runtime/sessions/[sessionId]/wallet/refresh/route.js",
-  "/api/cin-aux/runtime/sessions/[sessionId]/prices/refresh/route": "app/api/cin-aux/runtime/sessions/[sessionId]/prices/refresh/route.js",
-  "/(auth)/auth/page": "app/(auth)/auth/page.js",
-  "/cin/page": "app/cin/page.js",
-  "/settings/page": "app/settings/page.js",
-  "/admin/page": "app/admin/page.js"
+  "/api/vitals/health/route": "app/api/vitals/health/route.js",
+  "/api/vitals/status/route": "app/api/vitals/status/route.js",
+  "/str-aux/page": "app/str-aux/page.js",
+  "/audit/page": "app/audit/page.js",
+  "/matrices/page": "app/matrices/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/admin/audit/page": "app/admin/audit/page.js"
 }

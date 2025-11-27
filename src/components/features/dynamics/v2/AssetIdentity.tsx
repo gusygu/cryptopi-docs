@@ -268,20 +268,20 @@ function InsightBadge({ metric }: { metric: CurrencyMetric }) {
     ? TONE_CLASS[metric.tone]
     : "text-emerald-100";
   return (
-    <div className="rounded-xl border border-emerald-500/20 bg-black/15 p-2.5">
-      <div className="text-[9px] uppercase tracking-[0.28em] text-emerald-300/60">
+    <div className="rounded-2xl border border-emerald-400/20 bg-[#04141e]/70 px-3.5 py-3 shadow-[0_12px_28px_rgba(2,6,23,0.55)]">
+      <div className="text-[9px] uppercase tracking-[0.35em] text-emerald-100/70">
         {metric.label}
       </div>
       <div
         className={classNames(
-          "mt-1 text-base font-semibold tracking-tight",
+          "mt-1 text-lg font-semibold tracking-tight",
           toneClass,
         )}
       >
         {metric.value}
       </div>
       {metric.hint ? (
-        <div className="mt-1 text-[10px] text-emerald-300/55">
+        <div className="mt-1 text-[10px] text-emerald-300/60">
           {metric.hint}
         </div>
       ) : null}
@@ -306,22 +306,22 @@ function PairCard({
     : "Not allowed";
 
   return (
-    <div className="flex h-full flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-[#03070f]/75 p-3 shadow-[0_0_18px_rgba(16,185,129,0.12)]">
+    <div className="flex h-full flex-col gap-3 rounded-[24px] border border-emerald-400/20 bg-[#020812]/85 p-4 shadow-[0_18px_36px_rgba(0,0,0,0.4)]">
       <header className="flex items-center justify-between gap-2">
-        <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.25em] text-emerald-100/90">
           {title}
         </div>
         {preview ? (
-          <span className="rounded-full border border-emerald-400/50 bg-emerald-400/15 px-2 py-[1px] text-[9px] uppercase tracking-[0.24em] text-emerald-200">
+          <span className="rounded-full border border-emerald-300/50 bg-emerald-300/10 px-2 py-[1px] text-[9px] uppercase tracking-[0.3em] text-emerald-50/90">
             preview
           </span>
         ) : null}
       </header>
-      <ul className="space-y-1.5 text-[12px] text-emerald-100">
+      <ul className="grid gap-1.5 text-[11px] text-emerald-100/90">
         {metrics.map((item) => (
           <li
             key={item.key}
-            className="flex items-center justify-between gap-2 font-mono text-[11px] uppercase tracking-[0.2em]"
+            className="flex items-center justify-between gap-2 font-mono uppercase tracking-[0.2em]"
           >
             <span className="text-emerald-300/70">{item.label}</span>
             <span className="text-emerald-100/90 tracking-tight">
@@ -333,10 +333,10 @@ function PairCard({
       <button
         type="button"
         className={classNames(
-          "mt-auto inline-flex items-center justify-center rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.25em] transition",
+          "mt-auto inline-flex items-center justify-center rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.3em] transition",
           disabled
             ? "cursor-not-allowed border-emerald-500/20 bg-transparent text-emerald-400/40"
-            : "border-emerald-400/40 bg-emerald-400/15 text-emerald-100 hover:border-emerald-300/60 hover:bg-emerald-400/25",
+            : "border-emerald-300/40 bg-emerald-300/10 text-emerald-50 hover:border-emerald-200/70 hover:bg-emerald-400/20",
         )}
         disabled={disabled}
         onClick={() => onSelect?.()}
@@ -499,7 +499,8 @@ export default function AssetIdentity({
         data: refSeriesData,
         current: formatNumber(directPair?.metrics.ref, {
           fallback: "-",
-          precision: 4,
+          precision: 7,
+          minimumFractionDigits: 7,
         }),
       },
     ];
@@ -547,7 +548,7 @@ export default function AssetIdentity({
 
   const statusLabel = loading
     ? "Loading identity..."
-    : `Snapshot · ${formatRelative(lastUpdated)}`;
+    : `Snapshot - ${formatRelative(lastUpdated)}`;
 
   const primaryPairs = useMemo(
     () =>
@@ -570,48 +571,43 @@ export default function AssetIdentity({
       subtitle={`${A || "-"} / ${B || "-"}`}
       status={statusLabel}
       className={classNames(
-        "rounded-3xl border border-emerald-500/25 bg-[#050812]/90 shadow-[0_0_36px_rgba(16,185,129,0.15)] backdrop-blur",
+        "rounded-[26px] border border-emerald-400/20 bg-[#030912]/90 shadow-[0_20px_40px_rgba(0,0,0,0.45)] backdrop-blur",
         className,
       )}
-      contentClassName="flex flex-col gap-6"
+      contentClassName="flex flex-col gap-5"
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
-        <div className="flex flex-col gap-3 rounded-2xl border border-emerald-500/30 bg-[#03060f]/80 p-3.5">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/70">
-              Wallet
-            </div>
-            <ul className="mt-2 space-y-1.5 text-xs">
-              {walletEntries.map(({ coin, balance }) => (
-                <li
-                  key={coin}
-                  className="flex items-center justify-between gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-emerald-100/75"
-                >
-                  <span
-                    className={classNames(
-                      coin === A
-                        ? "text-emerald-200"
-                        : coin === B
-                        ? "text-cyan-200"
-                        : "text-emerald-300/60",
-                    )}
-                  >
-                    {coin}
-                  </span>
-                  <span className="tracking-normal text-[11px] text-emerald-100">
-                    {formatNumber(balance, { fallback: "-" })}
-                  </span>
-                </li>
-              ))}
-            </ul>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+        <div className="flex flex-col gap-3 rounded-[22px] border border-emerald-400/25 bg-[#020a13]/85 p-3">
+          <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-100/70">
+            Wallet focus
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {walletEntries.map(({ coin, balance }) => (
+              <div
+                key={coin}
+                className={classNames(
+                  "group flex min-w-[96px] flex-col rounded-2xl border px-2.5 py-1.5 text-[10px]",
+                  coin === A
+                    ? "border-emerald-300/60 bg-emerald-300/10 text-emerald-50"
+                    : coin === B
+                    ? "border-cyan-300/60 bg-cyan-300/10 text-cyan-50"
+                    : "border-emerald-400/20 bg-[#03121c]/80 text-emerald-100/70",
+                )}
+              >
+                <span className="font-mono uppercase tracking-[0.3em]">{coin}</span>
+                <span className="font-mono text-sm tracking-tight text-emerald-50">
+                  {formatNumber(balance, { fallback: "-" })}
+                </span>
+              </div>
+            ))}
           </div>
 
           {inlineMetrics?.length ? (
             <div>
-              <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/65">
-                Metrics
+              <div className="text-[10px] uppercase tracking-[0.35em] text-emerald-100/70">
+                Inline metrics
               </div>
-              <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
                 {inlineMetrics.map((metric) => (
                   <InsightBadge key={metric.label} metric={metric} />
                 ))}
@@ -620,7 +616,7 @@ export default function AssetIdentity({
           ) : null}
         </div>
 
-        <div className="flex min-h-[140px] flex-col gap-3 rounded-2xl border border-emerald-500/30 bg-[#010b14]/80 p-3">
+        <div className="flex min-h-[140px] flex-col gap-3 rounded-[22px] border border-emerald-400/25 bg-[#010812]/85 p-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/70">
@@ -637,10 +633,10 @@ export default function AssetIdentity({
                   type="button"
                   onClick={() => setFocusKey(option.key)}
                   className={classNames(
-                    "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] transition",
+                    "rounded-full border px-3 py-0.5 text-[11px] font-semibold uppercase tracking-[0.3em] transition",
                     focusKey === option.key
-                      ? "border-emerald-300/60 bg-emerald-300/20 text-emerald-100"
-                      : "border-emerald-500/20 bg-transparent text-emerald-300/60 hover:border-emerald-400/40 hover:bg-emerald-400/10",
+                      ? "border-emerald-300/70 bg-emerald-300/20 text-emerald-50"
+                      : "border-emerald-400/30 bg-transparent text-emerald-200/70 hover:border-emerald-300/50 hover:bg-emerald-300/10",
                   )}
                 >
                   {option.label}
@@ -649,12 +645,12 @@ export default function AssetIdentity({
             </div>
           </div>
 
-          <div className="flex-1 rounded-xl border border-emerald-500/20 bg-[#030b16]/80 p-2">
+          <div className="flex-1 rounded-[18px] border border-emerald-400/20 bg-[#020d18]/85 p-2.5">
             {selectedOption ? (
               <div className="flex h-full flex-col">
-                <div className="flex items-center justify-between text-xs text-emerald-300/70">
+                <div className="flex items-center justify-between text-xs text-emerald-100/70">
                   <span>Current</span>
-                  <span className="font-mono text-sm text-emerald-100">
+                  <span className="font-mono text-sm text-emerald-50">
                     {selectedOption.current}
                   </span>
                 </div>
@@ -691,7 +687,8 @@ export default function AssetIdentity({
                 label: "id_pct",
                 value: formatPercent(pair.metrics.id_pct, {
                   fallback: "-",
-                  precision: 3,
+                  precision: 7,
+                  minimumFractionDigits: 7,
                 }),
               },
               {
@@ -707,7 +704,8 @@ export default function AssetIdentity({
                 label: "ref",
                 value: formatNumber(pair.metrics.ref, {
                   fallback: "-",
-                  precision: 4,
+                  precision: 7,
+                  minimumFractionDigits: 7,
                 }),
               },
             ];
@@ -748,7 +746,8 @@ export default function AssetIdentity({
                 label: "id_pct",
                 value: formatPercent(pair.metrics.id_pct, {
                   fallback: "-",
-                  precision: 3,
+                  precision: 7,
+                  minimumFractionDigits: 7,
                 }),
               },
               {
@@ -764,7 +763,8 @@ export default function AssetIdentity({
                 label: "ref",
                 value: formatNumber(pair.metrics.ref, {
                   fallback: "-",
-                  precision: 4,
+                  precision: 7,
+                  minimumFractionDigits: 7,
                 }),
               },
             ];
@@ -790,7 +790,7 @@ export default function AssetIdentity({
 
       {variants.length ? (
         <div>
-          <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/70">
+          <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-100/70">
             Universe
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -798,7 +798,7 @@ export default function AssetIdentity({
               <button
                 key={coin}
                 type="button"
-                className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.24em] text-emerald-100 transition hover:border-emerald-400/40 hover:bg-emerald-400/20"
+                className="rounded-full border border-emerald-400/30 bg-[#03121c]/80 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.24em] text-emerald-50 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
                 onClick={() => onSelectCandidate?.(coin)}
               >
                 {coin}

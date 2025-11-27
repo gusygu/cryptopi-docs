@@ -40,6 +40,18 @@ const formatUsdSigned = (value: number | string | null | undefined): string => {
   return `${prefix}${USD_FORMAT.format(Math.abs(num))}`;
 };
 
+const formatUnitsWithAsset = (
+  value: string | number | null | undefined,
+  asset: string,
+): string => {
+  if (value == null) return "-";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  const magnitude = Math.abs(num);
+  const decimals = magnitude >= 1 ? 4 : 6;
+  return `${num.toFixed(decimals)} ${asset}`;
+};
+
 const formatPercent = (value: number | string | null | undefined): string => {
   const num = toNumber(value);
   if (!Number.isFinite(num)) return "-";
@@ -53,6 +65,8 @@ const formatUnits = (value: number | null | undefined, digits = 6): string => {
     maximumFractionDigits: digits,
   });
 };
+
+const AUTO_SYNC_INTERVAL_MS = 8000;
 
 async function safeJson(res: Response) {
   const ct = res.headers.get("content-type") || "";
@@ -91,6 +105,7 @@ const CinAuxClient: React.FC<CinAuxClientProps> = ({
     useState<CinRuntimeSessionSummary | null>(null);
   const [assets, setAssets] = useState<CinRuntimeAssetPnl[]>([]);
   const [moves, setMoves] = useState<CinRuntimeMoveRow[]>([]);
+  const [assetTau, setAssetTau] = useState<CinAssetTauRow[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
@@ -158,6 +173,7 @@ const CinAuxClient: React.FC<CinAuxClientProps> = ({
       setSelectedSession(null);
       setAssets([]);
       setMoves([]);
+      setAssetTau([]);
       setDetailError(null);
       return;
     }
@@ -169,7 +185,7 @@ const CinAuxClient: React.FC<CinAuxClientProps> = ({
       setDetailError(null);
 
       try {
-        const [assetsRes, movesRes] = await Promise.all([
+        const [assetsRes, movesRes, tauRes] = await Promise.all([
           fetch(
             `/api/cin-aux/runtime/sessions/${selectedSessionId}/balances`,
             { signal: controller.signal }
@@ -177,6 +193,10 @@ const CinAuxClient: React.FC<CinAuxClientProps> = ({
           fetch(`/api/cin-aux/runtime/sessions/${selectedSessionId}/moves`, {
             signal: controller.signal,
           }),
+          fetch(
+            `/api/cin-aux/runtime/sessions/${selectedSessionId}/tau/assets`,
+            { signal: controller.signal },
+          ),
         ]);
 
         // balances
@@ -205,12 +225,34 @@ const CinAuxClient: React.FC<CinAuxClientProps> = ({
         if (!movesRes.ok) {
           console.error("cin moves HTTP error", movesRes.status);
         } else {
-          const movesJson = await safeJson(movesRes);
-          if (Array.isArray(movesJson)) {
-            setMoves(movesJson as CinRuntimeMoveRow[]);
-          } else {
-            console.warn("cin moves unexpected payload", movesJson);
+          try {
+            const movesJson = await safeJson(movesRes);
+            if (Array.isArray(movesJson)) {
+              setMoves(movesJson as CinRuntimeMoveRow[]);
+            } else {
+              console.warn("cin moves unexpected payload", movesJson);
+              setMoves([]);
+            }
+          } catch (err) {
+            console.error("cin moves parse error", err);
             setMoves([]);
+          }
+        }
+
+        // per-asset tau
+        if (!tauRes.ok) {
+          setAssetTau([]);
+        } else {
+          try {
+            const tauJson = await safeJson(tauRes);
+            if (Array.isArray(tauJson)) {
+              setAssetTau(tauJson as CinAssetTauRow[]);
+            } else {
+              setAssetTau([]);
+            }
+          } catch (err) {
+            console.error("cin tau parse error", err);
+            setAssetTau([]);
           }
         }
       } catch (err: any) {
@@ -331,6 +373,7 @@ const CinAuxClient: React.FC<CinAuxClientProps> = ({
             session={selectedSession}
             assets={assets}
             moves={moves}
+            assetTau={assetTau}
             loading={loadingDetails}
             error={detailError}
             onRefreshSession={forceReloadDetails}
@@ -451,6 +494,7 @@ interface RuntimeSessionDetailProps {
   session: CinRuntimeSessionSummary | null;
   assets: CinRuntimeAssetPnl[];
   moves: CinRuntimeMoveRow[];
+  assetTau: CinAssetTauRow[];
   loading: boolean;
   error: string | null;
   onRefreshSession?: () => void;
@@ -462,6 +506,7 @@ const RuntimeSessionDetail: React.FC<RuntimeSessionDetailProps> = ({
   session,
   assets,
   moves,
+  assetTau,
   loading,
   error,
   onRefreshSession,
@@ -633,6 +678,7 @@ const RuntimeSessionDetail: React.FC<RuntimeSessionDetailProps> = ({
           )}
         </div>
         <MoveTable moves={moves} />
+        <AssetTauTable rows={assetTau} />
       </div>
     </div>
   );
@@ -780,7 +826,9 @@ const MoveTable: React.FC<{ moves: CinRuntimeMoveRow[] }> = ({ moves }) => {
               <th className="px-2 py-1">To</th>
               <th className="px-2 py-1">Symbol</th>
               <th className="px-2 py-1">Side</th>
-              <th className="px-2 py-1">Executed</th>
+              <th className="px-2 py-1">Sold</th>
+              <th className="px-2 py-1">Bought</th>
+              <th className="px-2 py-1">Notional</th>
               <th className="px-2 py-1">PnL</th>
               <th className="px-2 py-1">Imprint</th>
               <th className="px-2 py-1">Luggage</th>
@@ -816,11 +864,21 @@ const MoveTable: React.FC<{ moves: CinRuntimeMoveRow[] }> = ({ moves }) => {
                 </td>
                 <td className="px-2 py-1">
                   <span className="font-medium uppercase">
-                    {m.srcSide ?? "—"}
+                    {m.srcSide ?? "-"}
                   </span>
                 </td>
+                <td className="px-2 py-1 text-gray-700">
+                  {m.fromUnits
+                    ? formatUnitsWithAsset(m.fromUnits, m.fromAsset)
+                    : "-"}
+                </td>
+                <td className="px-2 py-1 text-gray-700">
+                  {m.toUnitsReceived
+                    ? formatUnitsWithAsset(m.toUnitsReceived, m.toAsset)
+                    : "-"}
+                </td>
                 <td className="px-2 py-1">
-                  {m.executedUsdt} <span className="text-gray-400">USDT</span>
+                  {formatUsd(m.executedUsdt)}
                 </td>
                 <td
                   className={`px-2 py-1 font-medium ${
@@ -846,6 +904,68 @@ const MoveTable: React.FC<{ moves: CinRuntimeMoveRow[] }> = ({ moves }) => {
         </table>
       </div>
     </>
+  );
+};
+
+const AssetTauTable: React.FC<{ rows: CinAssetTauRow[] }> = ({ rows }) => {
+  if (!rows.length) {
+    return (
+      <p className="text-xs text-gray-500 mt-2">
+        Imprint by coin will appear after moves are recorded.
+      </p>
+    );
+  }
+
+  const totals = rows.reduce(
+    (acc, row) => ({
+      imprint: acc.imprint + toNumber(row.imprintUsdt),
+      luggage: acc.luggage + toNumber(row.luggageUsdt),
+    }),
+    { imprint: 0, luggage: 0 },
+  );
+
+  return (
+    <div className="border rounded-lg bg-white/80 overflow-auto mt-3">
+      <table className="min-w-full text-xs">
+        <thead className="bg-gray-50 border-b text-gray-500">
+          <tr>
+            <th className="px-2 py-1 text-left">Asset</th>
+            <th className="px-2 py-1 text-left">Imprint</th>
+            <th className="px-2 py-1 text-left">Luggage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.assetId} className="border-b last:border-0">
+              <td className="px-2 py-1 font-semibold text-gray-700">
+                {row.assetId}
+              </td>
+              <td
+                className={`px-2 py-1 ${
+                  toNumber(row.imprintUsdt) >= 0
+                    ? "text-emerald-600"
+                    : "text-rose-600"
+                }`}
+              >
+                {formatUsdSigned(row.imprintUsdt)}
+              </td>
+              <td className="px-2 py-1">{formatUsd(row.luggageUsdt)}</td>
+            </tr>
+          ))}
+          <tr className="bg-gray-50 font-semibold text-gray-700">
+            <td className="px-2 py-1">Total</td>
+            <td
+              className={`px-2 py-1 ${
+                totals.imprint >= 0 ? "text-emerald-600" : "text-rose-600"
+              }`}
+            >
+              {formatUsdSigned(totals.imprint)}
+            </td>
+            <td className="px-2 py-1">{formatUsd(totals.luggage)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   );
 };
 
@@ -877,8 +997,40 @@ export function CinButtons({
   onAfterAction?: () => void;
   onMessage?: (message: string | null) => void;
 }) {
-  const run = async (action: () => Promise<void>) => {
-    onMessage?.(null);
+  const [autoSync, setAutoSync] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const RATE_LIMIT_COOLDOWN_MS = Number(process.env.NEXT_PUBLIC_CIN_RATE_LIMIT_COOLDOWN_MS ?? 60_000);
+
+  const isCoolingDown = () =>
+    cooldownUntil != null && cooldownUntil > Date.now();
+
+  const formatCooldownMessage = () => {
+    if (!isCoolingDown()) return "";
+    const seconds = Math.max(
+      1,
+      Math.ceil(((cooldownUntil as number) - Date.now()) / 1000),
+    );
+    return `Binance rate limit cooling down (${seconds}s remaining).`;
+  };
+
+  useEffect(() => {
+    setAutoSync(false);
+    setCooldownUntil(null);
+  }, [sessionId]);
+
+  const run = async (
+    action: () => Promise<void>,
+    opts?: { silent?: boolean },
+  ) => {
+    if (isCoolingDown()) {
+      if (!opts?.silent) {
+        onMessage?.(formatCooldownMessage());
+      }
+      return;
+    }
+    if (!opts?.silent) {
+      onMessage?.(null);
+    }
     try {
       await action();
       onAfterAction?.();
@@ -887,10 +1039,122 @@ export function CinButtons({
         err instanceof Error
           ? err.message
           : "Operation failed. Check server logs for details.";
-      onMessage?.(message);
+      const rateLimited =
+        message.includes("HTTP 429") ||
+        message.toLowerCase().includes("request weight");
+      if (rateLimited) {
+        const until = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+        setCooldownUntil(until);
+        setAutoSync(false);
+        onMessage?.(
+          `Binance request limit reached. Waiting ~${Math.ceil(
+            RATE_LIMIT_COOLDOWN_MS / 1000,
+          )}s before retry.`,
+        );
+      } else if (!opts?.silent) {
+        onMessage?.(message);
+      }
       console.error("[cin-aux action]", err);
     }
   };
+
+  const requestTradeSync = async () => {
+    const res = await fetch(
+      `/api/cin-aux/runtime/sessions/${sessionId}/trades/sync`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      },
+    );
+    if (res.status === 404) {
+      onMessage?.("Trade/convert sync endpoint not available yet.");
+      return null;
+    }
+    return ensureOk(res, "Trade sync");
+  };
+
+  const requestWalletIngest = async () => {
+    const ingestRes = await fetch(
+      `/api/cin-aux/runtime/sessions/${sessionId}/wallet/ingest`,
+      { method: "POST" },
+    );
+    return ensureOk(ingestRes, "Wallet ingest");
+  };
+
+  const requestWalletRefresh = async () => {
+    const refreshRes = await fetch(
+      `/api/cin-aux/runtime/sessions/${sessionId}/wallet/refresh`,
+      { method: "POST" },
+    );
+    return ensureOk(refreshRes, "Wallet refresh");
+  };
+
+  const requestPriceRefresh = async () => {
+    const res = await fetch(
+      `/api/cin-aux/runtime/sessions/${sessionId}/prices/refresh`,
+      { method: "POST" },
+    );
+    if (res.status === 404) {
+      onMessage?.("Price refresh endpoint not available yet.");
+      return null;
+    }
+    return ensureOk(res, "Price refresh");
+  };
+
+  const runWalletPipeline = async ({
+    includeTradeSync = false,
+    includePriceRefresh = false,
+    silent = false,
+  }: {
+    includeTradeSync?: boolean;
+    includePriceRefresh?: boolean;
+    silent?: boolean;
+  }) => {
+    if (includeTradeSync) {
+      await requestTradeSync();
+    }
+    const ingest = await requestWalletIngest();
+    await requestWalletRefresh();
+    let priceInfo: any = null;
+    if (includePriceRefresh) {
+      priceInfo = await requestPriceRefresh();
+    }
+    if (!silent) {
+      onMessage?.(
+        `Wallet recomputed (${ingest?.importedMoves ?? 0} moves imported)${
+          includePriceRefresh
+            ? `, prices refreshed for ${priceInfo?.marked ?? 0} assets.`
+            : "."
+        }`,
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (!autoSync || isCoolingDown()) return;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      await run(
+        () =>
+          runWalletPipeline({
+            includeTradeSync: true,
+            includePriceRefresh: true,
+            silent: true,
+          }),
+        { silent: true },
+      );
+      if (!cancelled) {
+        timer = setTimeout(tick, AUTO_SYNC_INTERVAL_MS);
+      }
+    };
+    let timer = setTimeout(tick, AUTO_SYNC_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [autoSync, sessionId, cooldownUntil]);
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -898,73 +1162,62 @@ export function CinButtons({
           className="rounded-2xl px-3 py-1 border text-sm"
           onClick={() =>
             run(async () => {
-              const res = await fetch(
-                `/api/cin-aux/runtime/sessions/${sessionId}/trades/sync`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ sessionId }),
-                }
-              );
-              if (res.status === 404) {
-                onMessage?.("Trade sync endpoint not available yet.");
-                return;
+              const data = await requestTradeSync();
+              if (data) {
+                const convert = data.importedConvert ?? 0;
+                onMessage?.(
+                  `Trades synced: ${data.importedTrades ?? "?"} (convert: ${convert})`,
+                );
               }
-              const data = await ensureOk(res, "Trade sync");
-              onMessage?.(`Trades synced: ${data.importedTrades ?? "?"}`);
             })
           }
         >
-          Sync Trades
-      </button>
-      <button
-        className="rounded-2xl px-3 py-1 border text-sm"
-        onClick={() =>
+          Sync Trades + Convert
+        </button>
+        <button
+          className="rounded-2xl px-3 py-1 border text-sm"
+          onClick={() =>
             run(async () => {
-              const ingestRes = await fetch(
-                `/api/cin-aux/runtime/sessions/${sessionId}/wallet/ingest`,
-                { method: "POST" }
-              );
-              const ingest = await ensureOk(ingestRes, "Wallet ingest");
-
-              const refreshRes = await fetch(
-                `/api/cin-aux/runtime/sessions/${sessionId}/wallet/refresh`,
-                { method: "POST" }
-              );
-              await ensureOk(refreshRes, "Wallet refresh");
+              const ingest = await requestWalletIngest();
               onMessage?.(
-                `Wallet recomputed (${ingest?.importedMoves ?? 0} moves imported).`
+                `Ingestion job queued (${ingest?.importedMoves ?? 0} move(s)).`,
               );
             })
           }
-      >
-        Refresh Wallet
-      </button>
-      <button
-        className="rounded-2xl px-3 py-1 border text-sm"
-        onClick={() =>
-          run(async () => {
-            const res = await fetch(
-              `/api/cin-aux/runtime/sessions/${sessionId}/prices/refresh`,
-              { method: "POST" }
-            );
-              if (res.status === 404) {
-                onMessage?.("Price refresh endpoint not available yet.");
-                return;
+        >
+          Run Ingestion Job
+        </button>
+        <button
+          className="rounded-2xl px-3 py-1 border text-sm"
+          onClick={() =>
+            run(() =>
+              runWalletPipeline({
+                includeTradeSync: true,
+              }),
+            )
+          }
+        >
+          Refresh Wallet
+        </button>
+        <button
+          className="rounded-2xl px-3 py-1 border text-sm"
+          onClick={() =>
+            run(async () => {
+              const data = await requestPriceRefresh();
+              if (data) {
+                onMessage?.(
+                  `Prices refreshed for ${data?.marked ?? 0} assets.`,
+                );
               }
-              const data = await ensureOk(res, "Price refresh");
-              onMessage?.(
-                `Prices refreshed for ${data?.marked ?? 0} assets.`
-              );
             })
           }
-      >
-        Refresh Prices
-      </button>
-      <button
-        className="rounded-2xl px-3 py-1 border text-sm"
-        onClick={() => {
-          if (!confirm("Close this session?")) return;
+        >
+          Refresh Prices
+        </button>
+        <button
+          className="rounded-2xl px-3 py-1 border text-sm"
+          onClick={() => {
+            if (!confirm("Close this session?")) return;
             run(async () => {
               const res = await fetch(
                 `/api/cin-aux/runtime/sessions/${sessionId}/close`,
@@ -980,6 +1233,39 @@ export function CinButtons({
           }}
         >
         Close Session
+      </button>
+      <button
+        className={`rounded-2xl px-3 py-1 border text-sm ${
+          autoSync ? "bg-emerald-600 text-white" : ""
+        }`}
+        onClick={() => {
+          if (!autoSync && isCoolingDown()) {
+            onMessage?.(formatCooldownMessage());
+            return;
+          }
+          const next = !autoSync;
+          setAutoSync(next);
+          onMessage?.(
+            next
+              ? "Auto refresh enabled (syncs every 8 seconds)."
+              : "Auto refresh disabled.",
+          );
+        }}
+      >
+        {autoSync ? "Auto Sync ON" : "Auto Sync OFF"}
+      </button>
+      <button
+        className="rounded-2xl px-3 py-1 text-sm text-white bg-blue-600 hover:bg-blue-700 shadow"
+        onClick={() =>
+          run(() =>
+            runWalletPipeline({
+              includeTradeSync: true,
+              includePriceRefresh: true,
+            }),
+          )
+        }
+      >
+        Full Sync &amp; Refresh
       </button>
     </div>
   );

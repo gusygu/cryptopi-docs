@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { getValidInviteByToken, createUserFromInvite } from "@/app/(server)/auth/invites";
+import { createSession } from "@/lib/auth/server";
 
 type Props = {
   searchParams?: {
@@ -15,30 +15,41 @@ async function registerFromInvite(formData: FormData) {
   const token = (formData.get("invite_token") ?? "").toString().trim();
   const nickname =
     (formData.get("nickname") ?? "").toString().trim() || null;
+  const password = (formData.get("password") ?? "").toString();
+  const confirm = (formData.get("password_confirm") ?? "").toString();
 
   if (!token) {
     redirect("/auth?err=missing_invite");
   }
 
-  const user = await createUserFromInvite(token, nickname);
-  if (!user) {
-    // invalid token, expired, or user already exists
-    redirect("/auth?err=invalid_or_used_invite");
+  if (!password || password.length < 8) {
+    redirect("/auth?err=weak_password");
   }
 
-  // Set session cookie (keep same format you already use: "email|timestamp")
-  const jar = await cookies();
-  const sessionVal = `${user.email}|${Date.now()}`;
+  if (password !== confirm) {
+    redirect("/auth?err=password_mismatch");
+  }
 
-  jar.set("session", sessionVal, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-  });
+  try {
+    const user = await createUserFromInvite({
+      token,
+      nicknameOverride: nickname,
+      password,
+    });
 
-  redirect("/");
+    await createSession(user.user_id);
+    redirect("/");
+  } catch (err: any) {
+    const code =
+      err?.message === "suspended_email"
+        ? "account_suspended"
+        : err?.message === "user_exists"
+        ? "account_exists"
+        : "invalid_or_used_invite";
+    redirect(`/auth?err=${code}`);
+  }
 }
+
 
 export default async function RegisterPage({ searchParams }: Props) {
   const token =
@@ -108,6 +119,41 @@ export default async function RegisterPage({ searchParams }: Props) {
               placeholder="How should we display you?"
               className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-0"
             />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-xs font-medium text-zinc-300"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                minLength={8}
+                required
+                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-0"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="password_confirm"
+                className="block text-xs font-medium text-zinc-300"
+              >
+                Confirm password
+              </label>
+              <input
+                id="password_confirm"
+                name="password_confirm"
+                type="password"
+                minLength={8}
+                required
+                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-0"
+              />
+            </div>
           </div>
 
           <button

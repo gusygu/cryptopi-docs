@@ -76,7 +76,7 @@ export async function GET() {
 
     const windows = labels.map(label => {
       const secs = windowSeconds(label);
-      let cycles_per_window =
+      const cycles_per_window =
         label === "30m" ? (P.str_cycles_m30 ?? 45) :
         label === "1h"  ? (P.str_cycles_h1  ?? 90) :
         label === "3h"  ? (P.str_cycles_h3  ?? 270) :

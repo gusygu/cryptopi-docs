@@ -18,7 +18,6 @@ import {
   type MatrixColorRules,
 } from "@/app/matrices/colouring";
 import { useSettings, selectCoins } from "@/lib/settings/client";
-import { requireUserSession } from "@/app/(server)/auth/session";
 
 
 const DEFAULT_POLL_MS = 40_000;
@@ -283,7 +282,6 @@ const buildQueryString = (params: URLSearchParams): string => {
 };
 
 export default function MatricesPage() {
-  const session = await requireUserSession(); 
   const searchParams = useSearchParams();
   const queryString = useMemo(() => buildQueryString(searchParams), [searchParams]);
   const pollMs = useMemo(() => {
@@ -706,7 +704,6 @@ function EmptyState() {
     </div>
   );
 }
-
 
 
 

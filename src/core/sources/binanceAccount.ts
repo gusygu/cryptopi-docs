@@ -37,8 +37,8 @@ export type AccountTrade = {
 
 export type MyTradesOptions = AccountOptions & {
   fromId?: number;
-  startTime?: number;  // epoch ms
-  endTime?: number;    // epoch ms
+  startTime?: number; // epoch ms
+  endTime?: number; // epoch ms
   limit?: number;
 };
 
@@ -71,7 +71,88 @@ export async function getMyTradesForSymbol(
     return await signedGET<AccountTrade[]>("/api/v3/myTrades", query, creds);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error ?? "myTrades fetch failed");
+    if (isWeightLimitError(error)) {
+      throw error instanceof Error ? error : new Error(message);
+    }
     console.warn(`getMyTradesForSymbol(${symbol}): ${message}`);
+    return [];
+  }
+}
+
+function isWeightLimitError(err: unknown): boolean {
+  if (!err) return false;
+  const code = typeof err === "object" && err !== null && "code" in err ? (err as any).code : undefined;
+  if (code === -1003) return true;
+  const message =
+    typeof err === "string"
+      ? err
+      : err instanceof Error
+        ? err.message
+        : String(err ?? "");
+  return /-1003/.test(message) || /request weight/i.test(message) || /IP banned/i.test(message) || /HTTP 418/.test(message);
+}
+
+// ---- /sapi/v1/convert/tradeFlow --------------------------------------------
+
+export type ConvertTradeFlowItem = {
+  orderId: number;
+  quoteId?: string;
+  fromAsset: string;
+  toAsset: string;
+  fromAmount: string;
+  toAmount: string;
+  price?: string;
+  fee?: string;
+  feeAsset?: string;
+  status?: string;
+  createTime: number;
+};
+
+export type ConvertTradeFlowOptions = AccountOptions & {
+  startTime: number;
+  endTime: number;
+  fromAsset?: string;
+  toAsset?: string;
+  limit?: number;
+};
+
+export async function getConvertTradeFlow(
+  options: ConvertTradeFlowOptions,
+): Promise<ConvertTradeFlowItem[]> {
+  const email = options.email?.toLowerCase() ?? null;
+  const creds = resolveCredentials(email);
+  if (!creds) {
+    const scope = email ? `for ${email}` : "(env)";
+    console.warn(`getConvertTradeFlow: missing credentials ${scope}`);
+    return [];
+  }
+
+  const query: QueryRecord = {
+    startTime: options.startTime,
+    endTime: options.endTime,
+    fromAsset: options.fromAsset,
+    toAsset: options.toAsset,
+    limit: Math.min(1000, options.limit ?? 100),
+  };
+
+  try {
+    const result = await signedGET<{ list?: ConvertTradeFlowItem[] }>(
+      "/sapi/v1/convert/tradeFlow",
+      query,
+      creds,
+    );
+    const list = Array.isArray(result?.list) ? result.list : [];
+    return list.filter(
+      (item): item is ConvertTradeFlowItem =>
+        !!item &&
+        typeof item.orderId === "number" &&
+        typeof item.createTime === "number" &&
+        typeof item.fromAsset === "string" &&
+        typeof item.toAsset === "string",
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "convert fetch failed");
+    console.warn(`getConvertTradeFlow: ${message}`);
     return [];
   }
 }
@@ -309,4 +390,3 @@ export async function fetchMyTradesForSymbol(args: {
   const json = (await res.json()) as BinanceTrade[];
   return json;
 }
-

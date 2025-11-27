@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Histogram from "@/components/features/str-aux/Histogram";
 
 type Props = {
   symbols?: string[];
@@ -49,7 +50,6 @@ export default function StrAuxClient({
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [storeReady, setStoreReady] = useState(false);
-  const [expandedBins, setExpandedBins] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(0);
 
   useEffect(() => {
@@ -152,22 +152,10 @@ export default function StrAuxClient({
                 );
               })()}
 
-              {(() => {
-                const hist = resolveHistogram(stats[sym]);
-                if (!hist || !hist.counts.length) return null;
-                const expanded = expandedBins[sym] ?? false;
-                return (
-                  <div className="mt-3">
-                    <button
-                      onClick={() => setExpandedBins((map) => ({ ...map, [sym]: !expanded }))}
-                      className="text-xs px-2 py-1 border border-indigo-500/40 rounded-lg text-indigo-100 hover:bg-indigo-500/10 mb-2"
-                    >
-                      {expanded ? 'Hide bins' : 'Show bins'}
-                    </button>
-                    {expanded && <HistogramView histogram={hist} />}
-                  </div>
-                );
-              })()}
+              <HistogramSections
+                statsEntry={stats[sym]}
+                vectorRow={vectors[sym]}
+              />
             </div>
           ))}
         </div>
@@ -334,44 +322,72 @@ function resolveStreams(entry: any) {
   return rows;
 }
 
-function resolveHistogram(entry: any) {
-  const hist =
-    entry?.stats?.histogram ??
-    entry?.hist ??
-    (entry?.stats?.histogram ?? null);
-  if (!hist || !Array.isArray(hist.counts)) return null;
-  const counts = hist.counts.map((n: any) => Number(n) || 0);
-  const edges = Array.isArray(hist.returnsPct)
-    ? hist.returnsPct.map((n: any) => Number(n))
-    : Array.isArray(hist.edges)
-    ? hist.edges.map((n: any) => Number(n))
-    : [];
-  return { counts, edges };
-}
-
-function HistogramView({ histogram }: { histogram: { counts: number[]; edges: number[] } }) {
-  const maxCount = histogram.counts.reduce((m, n) => (n > m ? n : m), 0) || 1;
-  const displayLength = Math.min(histogram.counts.length, 64);
-
+function HistogramSections({ statsEntry, vectorRow }: { statsEntry: any; vectorRow: VectorRow | undefined }) {
+  const binHistogram = resolveHistogram(statsEntry);
+  const vectorHistogram = resolveVectorHistogram(vectorRow);
+  if (!binHistogram && !vectorHistogram) return null;
   return (
-    <div className="space-y-1 text-xs">
-      {histogram.counts.slice(0, displayLength).map((count, idx) => {
-        const pct = Math.max(4, Math.round((count / maxCount) * 100));
-        const edge = histogram.edges[idx];
-        const label =
-          typeof edge === 'number' && Number.isFinite(edge) ? `${edge.toFixed(2)}%` : `bin ${idx + 1}`;
-        return (
-          <div key={`${label}-${idx}`} className="flex items-center gap-2">
-            <div className="w-20 text-right text-indigo-200/80">{label}</div>
-            <div className="flex-1 bg-[#10102a] rounded-full overflow-hidden h-3">
-              <div className="bg-indigo-500/70 h-full" style={{ width: `${pct}%` }}></div>
-            </div>
-            <div className="w-12 text-right text-indigo-200/90">{count}</div>
+    <div className="mt-4 space-y-4">
+      {binHistogram ? (
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-indigo-200/80 mb-2">
+            Binning histogram
           </div>
-        );
-      })}
+          <div className="rounded-2xl border border-indigo-900/30 bg-[#050517]/50 p-3">
+            <Histogram counts={binHistogram.counts} nuclei={binHistogram.nuclei} height={88} accent="violet" />
+          </div>
+        </div>
+      ) : null}
+      {vectorHistogram ? (
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-indigo-200/80 mb-2">
+            Vectors histogram
+          </div>
+          <div className="rounded-2xl border border-indigo-900/30 bg-[#050517]/50 p-3">
+            <Histogram counts={vectorHistogram.counts} nuclei={vectorHistogram.nuclei} height={88} accent="cyan" />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function resolveHistogram(entry: any) {
+  const hist =
+    entry?.hist ??
+    entry?.stats?.histogram ??
+    null;
+  if (!hist || !Array.isArray(hist.counts)) return null;
+  const counts = hist.counts.map((n: any) => Number(n) || 0);
+  const nucleiSource =
+    entry?.fm?.nuclei ??
+    entry?.stats?.fm?.nuclei ??
+    entry?.meta?.nuclei ??
+    [];
+  const nuclei = Array.isArray(nucleiSource)
+    ? nucleiSource
+        .map((n: any, idx: number) => {
+          const bin = n?.binIndex ?? n?.key?.idhr ?? n?.key?.bin ?? n?.id ?? idx;
+          return Number.isFinite(bin) ? Number(bin) : null;
+        })
+        .filter((idx: number | null): idx is number => typeof idx === "number" && idx >= 0 && idx < counts.length)
+    : [];
+  return { counts, nuclei };
+}
+
+function resolveVectorHistogram(row?: VectorRow) {
+  const perBin = row?.payload?.inner?.perBin;
+  if (!Array.isArray(perBin) || !perBin.length) return null;
+  const counts = perBin.map((bin) => Number(bin.samples ?? 0) || 0);
+  if (!counts.some((value) => value > 0)) return null;
+  const sorted = [...perBin].sort(
+    (a, b) => Number(b.share ?? 0) - Number(a.share ?? 0)
+  );
+  const highlight = sorted
+    .slice(0, Math.min(3, sorted.length))
+    .map((bin) => Number(bin.index ?? 0))
+    .filter((idx) => Number.isFinite(idx) && idx >= 0 && idx < counts.length);
+  return { counts, nuclei: highlight };
 }
 
 const toNumberOrNull = (value: unknown): number | null => {

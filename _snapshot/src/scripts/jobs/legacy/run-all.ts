@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-/* eslint-disable no-console */
+ 
 import 'dotenv/config';
 
 import { run as runWS } from './binance-stream';

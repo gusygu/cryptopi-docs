@@ -86,20 +86,20 @@ function formatRelative(value: AuxiliaryCardProps["lastUpdated"]) {
 
 function StatBadge({ label, value, hint }: StatBadgeProps) {
   return (
-    <div className="rounded-2xl border border-emerald-500/25 bg-[#02080e]/80 px-4 py-3 text-right text-sm text-emerald-200/80 shadow-[0_0_16px_rgba(16,185,129,0.08)]">
-      <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">{label}</div>
-      <div className="mt-1 font-mono text-xl leading-tight text-emerald-100">{value}</div>
-      {hint ? <div className="mt-1 text-[10px] text-emerald-300/55">{hint}</div> : null}
+    <div className="rounded-[20px] border border-emerald-400/25 bg-[#03121c]/80 px-4 py-3 text-right text-sm text-emerald-50/80 shadow-[0_15px_30px_rgba(0,0,0,0.45)]">
+      <div className="text-[10px] uppercase tracking-[0.35em] text-emerald-100/70">{label}</div>
+      <div className="mt-1 font-mono text-xl leading-tight text-emerald-50">{value}</div>
+      {hint ? <div className="mt-1 text-[10px] text-emerald-200/70">{hint}</div> : null}
     </div>
   );
 }
 
 function StrMetricItem({ label, value, hint }: StrMetricItemProps) {
   return (
-    <div className="rounded-xl border border-emerald-500/25 bg-black/25 px-3 py-3 text-right">
-      <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">{label}</div>
-      <div className="mt-1 font-mono text-[15px] leading-tight text-emerald-100">{value}</div>
-      {hint ? <div className="mt-1 text-[10px] text-emerald-300/60">{hint}</div> : null}
+    <div className="rounded-[18px] border border-emerald-400/20 bg-[#020a12]/80 px-3 py-3 text-right shadow-[0_12px_26px_rgba(0,0,0,0.45)]">
+      <div className="text-[10px] uppercase tracking-[0.35em] text-emerald-100/70">{label}</div>
+      <div className="mt-1 font-mono text-[15px] leading-tight text-emerald-50">{value}</div>
+      {hint ? <div className="mt-1 text-[10px] text-emerald-200/70">{hint}</div> : null}
     </div>
   );
 }
@@ -315,24 +315,24 @@ export default function AuxiliaryCard({
       subtitle={`${A} -> ${B}`}
       status={status}
       className={classNames(
-        "rounded-3xl border border-emerald-500/20 bg-[#03070f]/85 shadow-[0_0_28px_rgba(16,185,129,0.18)] backdrop-blur",
+        "rounded-[26px] border border-emerald-400/20 bg-[#02060d]/95 shadow-[0_20px_48px_rgba(0,0,0,0.5)] backdrop-blur",
         className
       )}
-      contentClassName="flex flex-col gap-6"
+      contentClassName="flex flex-col gap-5"
     >
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_0.9fr]">
-        <section className="rounded-2xl border border-emerald-500/25 bg-[#050b15]/90 p-5 shadow-[0_0_32px_rgba(16,185,129,0.12)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.65fr)_minmax(0,0.35fr)]">
+        <section className="rounded-[22px] border border-emerald-400/20 bg-[#030c15]/85 p-4 shadow-[0_14px_32px_rgba(0,0,0,0.45)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.4em] text-emerald-300/70">MOO snapshot</div>
-              <div className="mt-2 text-xs uppercase tracking-[0.3em] text-emerald-200/60">Value</div>
-              <div className="mt-1 font-mono text-4xl leading-none text-emerald-100">{formattedMoo}</div>
-              <div className="mt-2 text-[11px] uppercase tracking-[0.25em] text-emerald-300/70">
-                Tier <span className="text-emerald-100">{formattedTier}</span>
+              <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-100/70">MOO snapshot</div>
+              <div className="mt-2 text-xs uppercase tracking-[0.3em] text-emerald-200/70">Value</div>
+              <div className="mt-1 font-mono text-3xl leading-none text-emerald-50">{formattedMoo}</div>
+              <div className="mt-2 text-[10px] uppercase tracking-[0.3em] text-emerald-100/70">
+                Tier <span className="text-emerald-50">{formattedTier}</span>
               </div>
-              <div className="mt-2 text-xs text-emerald-300/60">Focus {A}/{B}</div>
+              <div className="mt-2 text-xs text-emerald-200/70">Focus {A}/{B}</div>
             </div>
-            <div className="flex flex-1 flex-wrap justify-end gap-3 min-w-[240px]">
+            <div className="flex min-w-[200px] flex-1 flex-wrap justify-end gap-3">
               <StatBadge label="Candidates" value={candidateCount} hint="Eligible STR pairs" />
               <StatBadge label="Universe" value={universeCount} hint="Coins in scope" />
               <StatBadge
@@ -346,14 +346,14 @@ export default function AuxiliaryCard({
               />
             </div>
           </div>
-          <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-[#04101a]/80 p-4">
-            <div className="mb-3 text-[11px] uppercase tracking-[0.35em] text-emerald-200">STR-Aux metrics</div>
+          <div className="mt-4 rounded-[20px] border border-emerald-400/25 bg-[#04101a]/80 p-3">
+            <div className="mb-2 text-[11px] uppercase tracking-[0.35em] text-emerald-100/80">STR-Aux metrics</div>
             {strState.error ? (
               <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-[11px] text-amber-200">
                 {strState.error}
               </div>
             ) : strState.loading ? (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, idx) => (
                   <div
                     key={`str-skeleton-${idx}`}
@@ -362,7 +362,7 @@ export default function AuxiliaryCard({
                 ))}
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 <StrMetricItem label="GFM" value={formattedGfm} hint="Absolute mode (price)" />
                 {strMetricsList.map((item) => (
                   <StrMetricItem key={item.label} label={item.label} value={item.value} hint={item.hint} />
@@ -371,10 +371,10 @@ export default function AuxiliaryCard({
             )}
           </div>
         </section>
-        <section className="rounded-2xl border border-emerald-500/25 bg-[#030a12]/85 p-5 space-y-4">
+        <section className="rounded-[22px] border border-emerald-400/20 bg-[#02060f]/85 p-4 space-y-3">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-300/70">Snapshot state</div>
-            <div className="mt-1 text-sm text-emerald-100">Updated {formatRelative(lastUpdated)}</div>
+            <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-100/70">Snapshot state</div>
+            <div className="mt-1 text-sm text-emerald-50">Updated {formatRelative(lastUpdated)}</div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <StatBadge label="GFM (abs)" value={formattedGfm} hint="Current str-aux mode" />
@@ -393,10 +393,10 @@ export default function AuxiliaryCard({
         </section>
       </div>
 
-      <div className="rounded-2xl border border-emerald-500/25 bg-[#050b15]/85 p-4">
+      <div className="rounded-[22px] border border-emerald-400/25 bg-[#030c15]/85 p-4">
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-200">CIN-Aux</div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/60">Session imprint · luggage</div>
+          <div className="text-[11px] uppercase tracking-[0.35em] text-emerald-100/80">CIN-Aux</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-200/70">Session imprint & luggage</div>
         </div>
         {loading ? (
           <div className="space-y-2 text-[11px] text-emerald-200/50">
@@ -405,35 +405,29 @@ export default function AuxiliaryCard({
             <div className="h-9 w-full animate-pulse rounded-lg bg-emerald-500/10" />
           </div>
         ) : derivedCinRows.length ? (
-          <div className="max-h-60 overflow-auto">
-            <table className="min-w-full border-separate border-spacing-y-2 text-[11px]">
-              <thead>
-                <tr className="text-emerald-200/70">
-                  <th className="w-24 text-left font-semibold uppercase tracking-[0.25em]">Coin</th>
-                  <th className="px-3 text-right font-semibold uppercase tracking-[0.25em]">Imprint</th>
-                  <th className="px-3 text-right font-semibold uppercase tracking-[0.25em]">Luggage</th>
-                </tr>
-              </thead>
-              <tbody>
-                {derivedCinRows.map(({ symbol, stat }) => (
-                  <tr key={symbol} className="align-middle text-emerald-100">
-                    <td className="rounded-l-xl bg-[#041017]/90 px-3 py-3 font-mono text-[12px] uppercase tracking-[0.25em] text-emerald-100">
-                      {symbol}
-                    </td>
-                    <td className="bg-[#041017]/70 px-3 py-3 text-right">
-                      <div className="font-mono text-[11px] tracking-normal text-emerald-100">
-                        {formatNumber(stat.session.imprint, { precision: 3, fallback: "0" })}
-                      </div>
-                    </td>
-                    <td className="rounded-r-xl bg-[#041017]/90 px-3 py-3 text-right">
-                      <div className="font-mono text-[11px] tracking-normal text-emerald-100">
-                        {formatNumber(stat.session.luggage, { precision: 3, fallback: "0" })}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-2">
+            {derivedCinRows.map(({ symbol, stat }) => (
+              <div
+                key={symbol}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-400/25 bg-[#041017]/80 px-3 py-2 text-[11px] text-emerald-50"
+              >
+                <div className="font-mono uppercase tracking-[0.3em]">{symbol}</div>
+                <div className="flex flex-1 items-center justify-end gap-3 text-right text-[10px]">
+                  <div>
+                    <div className="text-emerald-200/70">Imprint</div>
+                    <div className="font-mono text-sm text-emerald-50">
+                      {formatNumber(stat.session.imprint, { precision: 3, fallback: "0" })}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-emerald-200/70">Luggage</div>
+                    <div className="font-mono text-sm text-emerald-50">
+                      {formatNumber(stat.session.luggage, { precision: 3, fallback: "0" })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="rounded-xl border border-emerald-500/20 bg-black/30 px-3 py-4 text-sm text-emerald-200/70">

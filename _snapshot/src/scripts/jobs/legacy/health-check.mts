@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+ 
 const base = process.env.BASE_URL || 'http://localhost:3000';
 
 async function main() {

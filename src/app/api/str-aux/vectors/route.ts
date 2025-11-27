@@ -15,6 +15,12 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserSession } from "@/app/(server)/auth/session";
+import {
+  appendUserCycleLog,
+  insertStrSamplingLog,
+  type UserCycleStatus,
+} from "@/lib/server/audit-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -291,6 +297,113 @@ async function driveSampling(symbols: string[], opts: {
   return store;
 }
 
+type SamplingLogEntry = {
+  symbol: string;
+  windowLabel: SamplingWindowKey;
+  status: UserCycleStatus;
+  sampleTs: number | null;
+  message?: string;
+  meta?: Record<string, unknown>;
+};
+
+function buildSamplingLogEntry(
+  store: ReturnType<typeof getSamplingStore> | null,
+  symbol: string,
+  windowLabel: SamplingWindowKey,
+  opts: { error?: string } = {},
+): SamplingLogEntry {
+  if (!store) {
+    return {
+      symbol,
+      windowLabel,
+      status: opts.error ? "error" : "idle",
+      sampleTs: null,
+      message: opts.error,
+      meta: opts.error ? { error: opts.error } : undefined,
+    };
+  }
+  const snapshot = store.snapshot(symbol);
+  const windowSummary = snapshot.windows?.[windowLabel];
+  const latestMark =
+    windowSummary?.marks?.[windowSummary.marks.length - 1] ??
+    snapshot.lastClosedMark ??
+    null;
+  const status: UserCycleStatus = opts.error
+    ? "error"
+    : (latestMark?.health?.status ?? snapshot.cycle?.status ?? "warn");
+  const sampleTs = latestMark?.closedAt ?? snapshot.lastPoint?.ts ?? null;
+  const meta: Record<string, unknown> = {
+    cycle: snapshot.cycle,
+    window: windowSummary
+      ? {
+          size: windowSummary.size,
+          capacity: windowSummary.capacity,
+          statusCounts: windowSummary.statusCounts,
+        }
+      : null,
+  };
+  if (latestMark) {
+    meta.mark = {
+      id: latestMark.id,
+      startedAt: latestMark.startedAt,
+      closedAt: latestMark.closedAt,
+      durationMs: latestMark.durationMs,
+      pointsCount: latestMark.pointsCount,
+      price: latestMark.price,
+      spread: latestMark.spread,
+      volume: latestMark.volume,
+      health: latestMark.health,
+    };
+  }
+  if (opts.error) {
+    meta.error = opts.error;
+  }
+  return {
+    symbol,
+    windowLabel,
+    status,
+    sampleTs,
+    message: opts.error,
+    meta,
+  };
+}
+
+async function persistCycleAudit(params: {
+  ownerUserId: string;
+  sessionId?: string | number | null;
+  status: UserCycleStatus;
+  summary: string;
+  payload?: unknown;
+  samplingLogs: SamplingLogEntry[];
+}) {
+  try {
+    const cycleSeq = await appendUserCycleLog({
+      ownerUserId: params.ownerUserId,
+      sessionId: params.sessionId,
+      status: params.status,
+      summary: params.summary,
+      payload: params.payload,
+    });
+    if (!params.samplingLogs.length) return;
+    await Promise.all(
+      params.samplingLogs.map((entry) =>
+        insertStrSamplingLog({
+          ownerUserId: params.ownerUserId,
+          cycleSeq,
+          symbol: entry.symbol,
+          windowLabel: entry.windowLabel,
+          sampleTimestamp: entry.sampleTs,
+          status: entry.status,
+          message: entry.message,
+          meta: entry.meta ?? {},
+        }),
+      ),
+    );
+  } catch (err) {
+    console.warn("[str-aux/vectors] audit logging failed:", err);
+  }
+}
+
 /** Pick the window key from query/body safely. */
 function pickWindowKey(value?: string | null): SamplingWindowKey {
   const v = String(value ?? "").toLowerCase();
@@ -299,9 +412,10 @@ function pickWindowKey(value?: string | null): SamplingWindowKey {
 }
 
 // =============================================================================
-// GET — stateless compute with sampling + inline CSV
+// GET - stateless compute with sampling + inline CSV
 // =============================================================================
 export async function GET(req: NextRequest) {
+  const session = await requireUserSession();
   try {
     const url = new URL(req.url);
     const symbols = await resolveSymbols(url);
@@ -311,26 +425,33 @@ export async function GET(req: NextRequest) {
     const bins = qInt(url, "bins", 256);
     const scale = qFloat(url, "scale", 100);
     const tWin = qInt(url, "tendencyWin", 30);
-    const tNorm: "mad"|"stdev" = (url.searchParams.get("tendencyNorm") ?? "mad").toLowerCase() === "stdev" ? "stdev" : "mad";
+    const tNorm: "mad" | "stdev" =
+      (url.searchParams.get("tendencyNorm") ?? "mad").toLowerCase() === "stdev"
+        ? "stdev"
+        : "mad";
     const swapAlpha = qFloat(url, "swapAlpha", 1.2);
     const sampleCycles = qInt(url, "cycles", 0);
     const force = (url.searchParams.get("force") ?? "").toLowerCase() === "true";
-    const vectorCfg: VectorComputationConfig = { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha };
+    const vectorCfg: VectorComputationConfig = {
+      bins,
+      scale,
+      tendencyWindow: tWin,
+      tendencyNorm: tNorm,
+      swapAlpha,
+    };
 
-    // If requested (or by default), run sampling cycles to populate data
     const defaultCycles = Number.isFinite(sampleCycles) ? sampleCycles : 0;
     const store = await driveSampling(symbols, { window: windowKey, cycles: defaultCycles, force });
 
     const vectors: VectorRow[] = [];
     const errors: VectorError[] = [];
+    const samplingLogs: SamplingLogEntry[] = [];
 
     for (const sym of symbols) {
       try {
-        // Inline CSV (series_SYMBOL) has priority for quick tests
         const csv = url.searchParams.get(`series_${sym}`);
         let points: VectorPoint[] = parseSeriesCSV(csv);
 
-        // Otherwise, use SamplingStore points for the requested window.
         if (!points.length) {
           const raw: SamplingPoint[] = await ensureWindowPoints(store, sym, windowKey, bins);
           points = toVectorPoints(raw);
@@ -339,14 +460,18 @@ export async function GET(req: NextRequest) {
         const summary = computeSummary(points, vectorCfg);
         const row = toVectorRow(sym, summary, windowKey, vectorCfg);
         vectors.push(row);
+        samplingLogs.push(buildSamplingLogEntry(store, sym, windowKey));
         await persistVector(sym, windowKey, summary, Date.now());
       } catch (e: any) {
-        errors.push({ symbol: sym, error: String(e?.message ?? e) });
-        vectors.push(toVectorRow(sym, neutralSummary(vectorCfg.bins, vectorCfg.scale), windowKey, vectorCfg));
+        const message = String(e?.message ?? e);
+        errors.push({ symbol: sym, error: message });
+        samplingLogs.push(buildSamplingLogEntry(store, sym, windowKey, { error: message }));
+        vectors.push(
+          toVectorRow(sym, neutralSummary(vectorCfg.bins, vectorCfg.scale), windowKey, vectorCfg),
+        );
       }
     }
 
-    // Optional: expose light sampling diagnostics for the first window
     const diag = (() => {
       try {
         const any = symbols[0];
@@ -374,12 +499,41 @@ export async function GET(req: NextRequest) {
               }
             : null,
         };
-      } catch { return null; }
+      } catch {
+        return null;
+      }
     })();
+
+    const cycleStatus: UserCycleStatus =
+      errors.length && errors.length === symbols.length
+        ? "error"
+        : errors.length
+        ? "warn"
+        : vectors.length
+        ? "ok"
+        : "idle";
+    const summaryParts = [`Sampled ${symbols.length} symbol(s)`];
+    if (errors.length) summaryParts.push(`errors=${errors.length}`);
+    const summary = summaryParts.join(" | ");
+
+    await persistCycleAudit({
+      ownerUserId: session.userId,
+      status: cycleStatus,
+      summary,
+      payload: {
+        route: "GET /api/str-aux/vectors",
+        window: windowKey,
+        bins,
+        symbols,
+        errors,
+        diag,
+      },
+      samplingLogs,
+    });
 
     return NextResponse.json(
       { ok: true, ts: Date.now(), window: windowKey, bins, symbols, vectors, diag, errors },
-      { headers: { "Cache-Control": "no-store, max-age=0" } }
+      { headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: String(err?.message ?? err) }, { status: 500 });
@@ -405,6 +559,7 @@ export async function GET(req: NextRequest) {
 // }
 // =============================================================================
 export async function POST(req: NextRequest) {
+  const session = await requireUserSession();
   try {
     const b = await req.json().catch(() => ({} as any));
     ensureSamplingRuntime();
@@ -432,7 +587,14 @@ export async function POST(req: NextRequest) {
 
     const vectors: VectorRow[] = [];
     const errors: VectorError[] = [];
-    const vectorCfg: VectorComputationConfig = { bins, scale, tendencyWindow: tWin, tendencyNorm: tNorm, swapAlpha };
+    const samplingLogs: SamplingLogEntry[] = [];
+    const vectorCfg: VectorComputationConfig = {
+      bins,
+      scale,
+      tendencyWindow: tWin,
+      tendencyNorm: tNorm,
+      swapAlpha,
+    };
 
     // Path A: explicit points_map
     if (b?.points_map && typeof b.points_map === "object") {
@@ -441,14 +603,36 @@ export async function POST(req: NextRequest) {
           const points = Array.isArray(b.points_map[sym]) ? b.points_map[sym] : [];
           const summary = computeSummary(points, vectorCfg);
           vectors.push(toVectorRow(sym, summary, windowKey, vectorCfg));
+          samplingLogs.push(buildSamplingLogEntry(null, sym, windowKey));
         } catch (e: any) {
-          errors.push({ symbol: sym, error: String(e?.message ?? e) });
-          vectors.push(toVectorRow(sym, neutralSummary(vectorCfg.bins, vectorCfg.scale), windowKey, vectorCfg));
+          const message = String(e?.message ?? e);
+          errors.push({ symbol: sym, error: message });
+          samplingLogs.push(buildSamplingLogEntry(null, sym, windowKey, { error: message }));
+          vectors.push(
+            toVectorRow(sym, neutralSummary(vectorCfg.bins, vectorCfg.scale), windowKey, vectorCfg),
+          );
         }
       }
+      const status: UserCycleStatus = errors.length ? "warn" : "ok";
+      await persistCycleAudit({
+        ownerUserId: session.userId,
+        status,
+        summary: `POST str-aux vectors | mode=points_map | symbols=${symbols.length}${
+          errors.length ? ` | errors=${errors.length}` : ""
+        }`,
+        payload: {
+          route: "POST /api/str-aux/vectors",
+          mode: "points_map",
+          window: windowKey,
+          bins,
+          symbols,
+          errors,
+        },
+        samplingLogs,
+      });
       return NextResponse.json(
         { ok: true, ts: Date.now(), window: windowKey, bins, symbols, vectors, errors },
-        { headers: { "Cache-Control": "no-store, max-age=0" } }
+        { headers: { "Cache-Control": "no-store, max-age=0" } },
       );
     }
 
@@ -464,15 +648,45 @@ export async function POST(req: NextRequest) {
         const summary = computeSummary(points, vectorCfg);
         vectors.push(toVectorRow(sym, summary, windowKey, vectorCfg));
         await persistVector(sym, windowKey, summary, Date.now());
+        samplingLogs.push(buildSamplingLogEntry(store, sym, windowKey));
       } catch (e: any) {
-        errors.push({ symbol: sym, error: String(e?.message ?? e) });
-        vectors.push(toVectorRow(sym, neutralSummary(vectorCfg.bins, vectorCfg.scale), windowKey, vectorCfg));
+        const message = String(e?.message ?? e);
+        errors.push({ symbol: sym, error: message });
+        samplingLogs.push(buildSamplingLogEntry(store, sym, windowKey, { error: message }));
+        vectors.push(
+          toVectorRow(sym, neutralSummary(vectorCfg.bins, vectorCfg.scale), windowKey, vectorCfg),
+        );
       }
     }
 
+    const cycleStatus: UserCycleStatus =
+      errors.length && errors.length === symbols.length
+        ? "error"
+        : errors.length
+        ? "warn"
+        : vectors.length
+        ? "ok"
+        : "idle";
+    await persistCycleAudit({
+      ownerUserId: session.userId,
+      status: cycleStatus,
+      summary: `POST str-aux vectors | mode=sampling | symbols=${symbols.length}${
+        errors.length ? ` | errors=${errors.length}` : ""
+      }`,
+      payload: {
+        route: "POST /api/str-aux/vectors",
+        mode: "sampling",
+        window: windowKey,
+        bins,
+        symbols,
+        errors,
+      },
+      samplingLogs,
+    });
+
     return NextResponse.json(
       { ok: true, ts: Date.now(), window: windowKey, bins, symbols, vectors, errors },
-      { headers: { "Cache-Control": "no-store, max-age=0" } }
+      { headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: String(err?.message ?? err) }, { status: 500 });

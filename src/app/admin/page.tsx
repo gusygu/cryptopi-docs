@@ -22,8 +22,10 @@ export default async function AdminDashboardPage() {
   const [userStats] = await sql`
     SELECT
       count(*)::int AS total_users,
-      count(*) FILTER (WHERE is_admin)::int AS admin_users
-    FROM auth.user_account
+      count(*) FILTER (WHERE is_admin)::int AS admin_users,
+      count(*) FILTER (WHERE status = 'suspended')::int AS suspended_users,
+      count(*) FILTER (WHERE status = 'pending')::int AS pending_users
+    FROM auth."user"
   `;
 
   const [inviteStats] = await sql`
@@ -71,6 +73,18 @@ export default async function AdminDashboardPage() {
             Admins:{" "}
             <span className="font-mono">
               {userStats?.admin_users ?? 0}
+            </span>
+          </p>
+          <p className="mt-1 text-[11px] text-zinc-500">
+            Suspended:{" "}
+            <span className="font-mono">
+              {userStats?.suspended_users ?? 0}
+            </span>
+          </p>
+          <p className="mt-1 text-[11px] text-zinc-500">
+            Pending:{" "}
+            <span className="font-mono">
+              {userStats?.pending_users ?? 0}
             </span>
           </p>
         </div>

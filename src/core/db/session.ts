@@ -1,7 +1,7 @@
 // Session + timeframe utilities (shared across CLI/server) + lightweight SQL tag helper.
 
 import type { QueryResult } from "pg";
-import { db, getPool, withClient } from "./pool_server";
+import { db, getPool, query, withClient } from "./pool_server";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { randomBytes } from "crypto";
@@ -35,7 +35,7 @@ async function runSqlTag<T>(
   values: any[]
 ): Promise<T[]> {
   const { text, params } = compileSql(strings, values);
-  const res: QueryResult<T> = await getPool().query<T>(text, params);
+  const res: QueryResult<T> = await query<T>(text, params);
   return res.rows;
 }
 

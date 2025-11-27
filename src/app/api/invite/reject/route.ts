@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/core/db/db";
 import { requireAdmin } from "../_admin";
+import { logAdminAction } from "@/app/(server)/admin/log";
+import { notifyRequesterOfDecision } from "@/lib/notifications/invite";
 
 export async function POST(req: Request) {
   const adminCheck = await requireAdmin();
@@ -22,7 +24,7 @@ export async function POST(req: Request) {
   if (session?.email) {
     const adminRows = await sql`
       SELECT user_id
-      FROM auth.user_account
+      FROM auth."user"
       WHERE lower(email) = ${session.email.toLowerCase()}
       LIMIT 1
     `;
@@ -50,8 +52,23 @@ export async function POST(req: Request) {
     );
   }
 
+  const request = rows[0];
+
+  await logAdminAction({
+    actionType: "invite.rejected",
+    actionScope: "invites",
+    targetEmail: request.email,
+    message: `${session.email} rejected invite request ${requestId}`,
+    meta: { request_id: requestId },
+  });
+
+  await notifyRequesterOfDecision({
+    email: request.email,
+    approved: false,
+  });
+
   return NextResponse.json({
     ok: true,
-    request: rows[0],
+    request,
   });
 }

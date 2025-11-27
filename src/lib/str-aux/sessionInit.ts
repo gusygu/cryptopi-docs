@@ -1,5 +1,5 @@
 // src/lib/str-aux/sessionInit.ts
-/* eslint-disable no-console */
+ 
 import { Pool } from 'pg';
 
 export type WindowKey = '30m' | '1h' | '3h';

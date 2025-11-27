@@ -31,7 +31,7 @@ export async function logAdminAction(input: AdminActionLogInput) {
         meta
       )
       VALUES (
-        ${null},                               -- we'll resolve ids later if needed
+        ${session?.userId ?? null},
         ${session?.email ?? null},
         ${input.targetUserId ?? null},
         ${input.targetEmail ?? null},

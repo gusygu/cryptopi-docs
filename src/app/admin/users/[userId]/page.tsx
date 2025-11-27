@@ -3,6 +3,31 @@ import { sql } from "@/core/db/db";
 import { requireUserSession } from "@/app/(server)/auth/session";
 import { getUserSettings } from "@/lib/settings/store";
 
+type AdminUserDetail = {
+  user_id: string;
+  email: string;
+  nickname: string | null;
+  is_admin: boolean;
+  status: "active" | "suspended" | "invited";
+  created_at: string;
+  updated_at: string;
+  last_login_at: string | null;
+  invite_id: string | null;
+  source: "auth_user" | "user_account_only";
+};
+
+type UserAccountRow = {
+  user_id: string;
+  email: string;
+  nickname: string | null;
+  is_admin: boolean;
+  status: "active" | "suspended" | "invited";
+  created_at: string;
+  updated_at: string;
+  last_login_at: string | null;
+  invite_id: string | null;
+};
+
 type Params = { userId: string };
 
 export default async function AdminUserDetailPage({ params }: { params: Params }) {
@@ -12,36 +37,107 @@ export default async function AdminUserDetailPage({ params }: { params: Params }
   const userId = params.userId;
   if (!userId) notFound();
 
-  const rows = await sql`
+  const coreRows = await sql`
     SELECT
-      u.user_id,
-      u.email,
-      u.nickname,
-      u.is_admin,
-      u.status,
-      u.created_at,
-      u.updated_at,
-      u.last_login_at,
-      u.invite_id
-    FROM auth.user_account u
-    WHERE u.user_id = ${userId}
+      user_id,
+      email,
+      nickname,
+      is_admin,
+      status,
+      created_at,
+      last_login_at
+    FROM auth."user"
+    WHERE user_id = ${userId}
     LIMIT 1
   `;
-  if (rows.length === 0) notFound();
 
-  const user = rows[0] as {
-    user_id: string;
-    email: string;
-    nickname: string | null;
-    is_admin: boolean;
-    status: "active" | "suspended" | "invited";
-    created_at: string;
-    updated_at: string;
-    last_login_at: string | null;
-    invite_id: string | null;
-  };
+  let user: AdminUserDetail | null = null;
+  let accountRow: UserAccountRow | null = null;
 
-  // invite that created this user, if any
+  if (coreRows.length > 0) {
+    const base = coreRows[0] as {
+      user_id: string;
+      email: string;
+      nickname: string | null;
+      is_admin: boolean;
+      status: "active" | "suspended" | "pending";
+      created_at: string;
+      last_login_at: string | null;
+    };
+
+    const [accountMatch] = await sql`
+      SELECT
+        user_id,
+        email,
+        nickname,
+        is_admin,
+        status,
+        created_at,
+        updated_at,
+        last_login_at,
+        invite_id
+      FROM auth.user_account
+      WHERE lower(email) = ${base.email.toLowerCase()}
+      LIMIT 1
+    `;
+
+    if (accountMatch) {
+      accountRow = accountMatch as UserAccountRow;
+    }
+
+    user = {
+      user_id: base.user_id,
+      email: base.email,
+      nickname: accountRow?.nickname ?? base.nickname,
+      is_admin: accountRow?.is_admin ?? base.is_admin,
+      status: (accountRow?.status ??
+        (base.status === "pending" ? "invited" : base.status)) as
+        | "active"
+        | "suspended"
+        | "invited",
+      created_at: base.created_at,
+      updated_at: accountRow?.updated_at ?? base.created_at,
+      last_login_at: base.last_login_at,
+      invite_id: accountRow?.invite_id ?? null,
+      source: "auth_user",
+    };
+  } else {
+    const accountRows = await sql`
+      SELECT
+        user_id,
+        email,
+        nickname,
+        is_admin,
+        status,
+        created_at,
+        updated_at,
+        last_login_at,
+        invite_id
+      FROM auth.user_account
+      WHERE user_id = ${userId}
+      LIMIT 1
+    `;
+    if (accountRows.length > 0) {
+      const acct = accountRows[0] as {
+        user_id: string;
+        email: string;
+        nickname: string | null;
+        is_admin: boolean;
+        status: "active" | "suspended" | "invited";
+        created_at: string;
+        updated_at: string;
+        last_login_at: string | null;
+        invite_id: string | null;
+      };
+      user = {
+        ...acct,
+        source: "user_account_only",
+      };
+    }
+  }
+
+  if (!user) notFound();
+
   let invite: any = null;
   if (user.invite_id) {
     const invRows = await sql`

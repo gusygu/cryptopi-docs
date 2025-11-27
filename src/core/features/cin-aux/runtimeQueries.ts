@@ -66,15 +66,17 @@ export async function fetchRuntimeSessionSummary(
   return mapRuntimeSessionRow(rows[0]);
 }
 
-export async function listRuntimeSessions(): Promise<CinRuntimeSessionSummary[]> {
+export async function listRuntimeSessions(ownerUserId: string): Promise<CinRuntimeSessionSummary[]> {
   const { rows } = await db.query(
     `
       SELECT s.*, recon.cin_total_mtm_usdt, recon.ref_total_usdt, recon.delta_usdt, recon.delta_ratio
         FROM cin_aux.v_rt_session_summary s
         LEFT JOIN cin_aux.v_rt_session_recon recon
           ON recon.session_id = s.session_id
+       WHERE s.owner_user_id = $1
        ORDER BY s.started_at DESC
     `,
+    [ownerUserId],
   );
   return rows.map(mapRuntimeSessionRow);
 }

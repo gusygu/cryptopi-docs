@@ -5,6 +5,9 @@ import {
   COLOR_MUTED,
   COLOR_NEGATIVE_SHADES,
   COLOR_POSITIVE_SHADES,
+  COLOR_MOO_NEGATIVE_SHADES,
+  COLOR_MOO_POSITIVE_SHADES,
+  NULL_SENSITIVITY,
   FROZEN_STAGE_COLORS,
   type FrozenStage,
   withAlpha,
@@ -35,6 +38,8 @@ export type CellPresentation = {
 
 export const POSITIVE_SHADES = COLOR_POSITIVE_SHADES;
 export const NEGATIVE_SHADES = COLOR_NEGATIVE_SHADES;
+export const MOO_POSITIVE_SHADES = COLOR_MOO_POSITIVE_SHADES;
+export const MOO_NEGATIVE_SHADES = COLOR_MOO_NEGATIVE_SHADES;
 
 export const ZERO_BACKGROUND = withAlpha(COLOR_AMBER, 0.32);
 export const MUTED_BACKGROUND = withAlpha(COLOR_MUTED, 0.28);
@@ -158,13 +163,23 @@ export function resolveCellPresentation({
   inverseSymbol: string;
   symbolSets: SymbolSets;
 }): CellPresentation {
+  const sanitize = (input: number | null | undefined): number | null => {
+    if (input == null) return null;
+    const num = Number(input);
+    if (!Number.isFinite(num)) return null;
+    if (Math.abs(num) <= NULL_SENSITIVITY) return null;
+    return num;
+  };
+
   const palettePositive = rules.positivePalette ?? POSITIVE_SHADES;
   const paletteNegative = rules.negativePalette ?? NEGATIVE_SHADES;
-  const derived = rules.derive(value);
-  const previousDerived = prevValue === undefined ? null : rules.derive(prevValue ?? null);
+  const normalizedValue = sanitize(value);
+  const derived = rules.derive(normalizedValue);
+  const normalizedPrev = prevValue === undefined ? null : sanitize(prevValue ?? null);
+  const previousDerived = prevValue === undefined ? null : rules.derive(normalizedPrev);
 
   let polarity: MatrixCell["polarity"] = "neutral";
-  let background = MUTED_BACKGROUND;
+  let background = normalizedValue == null ? ZERO_BACKGROUND : MUTED_BACKGROUND;
   let textColor: string | undefined;
 
   const effectiveStage: FrozenStage | null = frozenStage ?? (frozen ? "mid" : null);
